@@ -442,9 +442,18 @@ class _OrderDetailsView extends StatelessWidget {
                       final provider = context.read<RestaurantProvider>();
                       final foodItems = order.items.where((item) {
                         final menuItem = provider.menuItems.firstWhere((m) => m.id == item.menuItemId, orElse: () => MenuItem(id: '', categoryId: '', name: '', price: 0, itemType: 'food'));
-                        return menuItem.itemType == 'food';
+                        return menuItem.itemType.toLowerCase() == 'food';
                       }).toList();
-                      await BillingService.printInvoice(order, title: 'KOT - FOOD', customItems: foodItems);
+                      
+                      // Fallback: If no items are categorized as drinks, print all items as food
+                      final hasDrinks = order.items.any((item) {
+                        final menuItem = provider.menuItems.firstWhere((m) => m.id == item.menuItemId, orElse: () => MenuItem(id: '', categoryId: '', name: '', price: 0, itemType: 'food'));
+                        return menuItem.itemType.toLowerCase() == 'drink';
+                      });
+                      
+                      final itemsToPrint = !hasDrinks ? order.items : foodItems;
+                      
+                      await BillingService.printInvoice(order, title: 'KOT - FOOD', customItems: itemsToPrint);
                     },
                     icon: Icons.restaurant,
                     label: 'Print Food',
@@ -455,7 +464,7 @@ class _OrderDetailsView extends StatelessWidget {
                       final provider = context.read<RestaurantProvider>();
                       final drinkItems = order.items.where((item) {
                         final menuItem = provider.menuItems.firstWhere((m) => m.id == item.menuItemId, orElse: () => MenuItem(id: '', categoryId: '', name: '', price: 0, itemType: 'food'));
-                        return menuItem.itemType == 'drink';
+                        return menuItem.itemType.toLowerCase() == 'drink';
                       }).toList();
                       await BillingService.printInvoice(order, title: 'BOT - DRINKS', customItems: drinkItems);
                     },
