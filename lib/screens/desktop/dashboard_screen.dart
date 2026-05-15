@@ -260,6 +260,137 @@ class _OrderDetailsView extends StatelessWidget {
 
   const _OrderDetailsView({required this.order, required this.onStatusUpdate});
 
+  void _showEditOrderDialog(BuildContext context, OrderModel order) {
+    final provider = context.read<RestaurantProvider>();
+    final menuItems = provider.menuItems;
+    
+    List<Map<String, dynamic>> editedItems = order.items.map((item) => {
+      'menu_item_id': item.menuItemId,
+      'quantity': item.quantity,
+      'price': item.price,
+      'name': item.itemName,
+    }).toList();
+
+    String? selectedMenuItemId = menuItems.isNotEmpty ? menuItems.first.id : null;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text('Edit Order #${order.id.substring(0,8)}'),
+          content: SizedBox(
+            width: 600,
+            height: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: selectedMenuItemId,
+                        items: menuItems.map((m) => DropdownMenuItem(value: m.id, child: Text(m.name))).toList(),
+                        onChanged: (val) => setState(() => selectedMenuItemId = val),
+                        decoration: const InputDecoration(labelText: 'Select Item to Add'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (selectedMenuItemId != null) {
+                          final item = menuItems.firstWhere((m) => m.id == selectedMenuItemId);
+                          setState(() {
+                            final existingIndex = editedItems.indexWhere((i) => i['menu_item_id'] == item.id);
+                            if (existingIndex >= 0) {
+                              editedItems[existingIndex]['quantity'] += 1;
+                            } else {
+                              editedItems.add({
+                                'menu_item_id': item.id,
+                                'quantity': 1,
+                                'price': item.price,
+                                'name': item.name,
+                              });
+                            }
+                          });
+                        }
+                      },
+                      child: const Text('Add'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: editedItems.length,
+                    itemBuilder: (context, index) {
+                      final item = editedItems[index];
+                      return ListTile(
+                        title: Text(item['name'] ?? 'Unknown'),
+                        subtitle: Text('₹${item['price']} x ${item['quantity']}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.remove),
+                              onPressed: () {
+                                setState(() {
+                                  if (item['quantity'] > 1) {
+                                    item['quantity'] -= 1;
+                                  } else {
+                                    editedItems.removeAt(index);
+                                  }
+                                });
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.add),
+                              onPressed: () {
+                                setState(() {
+                                  item['quantity'] += 1;
+                                });
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () {
+                                setState(() {
+                                  editedItems.removeAt(index);
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                final itemsToSave = editedItems.map((item) => {
+                  'order_id': order.id,
+                  'menu_item_id': item['menu_item_id'],
+                  'quantity': item['quantity'],
+                  'price': item['price'],
+                }).toList();
+                
+                await SupabaseService().updateOrderItems(order.id, itemsToSave);
+                provider.fetchData();
+                Navigator.pop(context);
+                onStatusUpdate();
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final service = SupabaseService();
@@ -296,8 +427,42 @@ class _OrderDetailsView extends StatelessWidget {
                   ),
                 ],
               ),
-              Row(
+              Wrap(
+                spacing: 16,
+                runSpacing: 16,
                 children: [
+                  _ActionButton(
+                    onPressed: () => _showEditOrderDialog(context, order),
+                    icon: Icons.edit_outlined,
+                    label: 'Edit Order',
+                    color: Colors.orange,
+                  ),
+                  _ActionButton(
+                    onPressed: () async {
+                      final provider = context.read<RestaurantProvider>();
+                      final foodItems = order.items.where((item) {
+                        final menuItem = provider.menuItems.firstWhere((m) => m.id == item.menuItemId, orElse: () => MenuItem(id: '', categoryId: '', name: '', price: 0, itemType: 'food'));
+                        return menuItem.itemType == 'food';
+                      }).toList();
+                      await BillingService.printInvoice(order, title: 'KOT - FOOD', customItems: foodItems);
+                    },
+                    icon: Icons.restaurant,
+                    label: 'Print Food',
+                    color: Colors.brown,
+                  ),
+                  _ActionButton(
+                    onPressed: () async {
+                      final provider = context.read<RestaurantProvider>();
+                      final drinkItems = order.items.where((item) {
+                        final menuItem = provider.menuItems.firstWhere((m) => m.id == item.menuItemId, orElse: () => MenuItem(id: '', categoryId: '', name: '', price: 0, itemType: 'food'));
+                        return menuItem.itemType == 'drink';
+                      }).toList();
+                      await BillingService.printInvoice(order, title: 'BOT - DRINKS', customItems: drinkItems);
+                    },
+                    icon: Icons.local_bar,
+                    label: 'Print Drinks',
+                    color: Colors.purple,
+                  ),
                   _ActionButton(
                     onPressed: () async {
                       await BillingService.printInvoice(order);
@@ -308,7 +473,6 @@ class _OrderDetailsView extends StatelessWidget {
                     label: 'Print & Settle',
                     color: Colors.blue,
                   ),
-                  const SizedBox(width: 16),
                   _ActionButton(
                     onPressed: () async {
                       await service.updateOrderStatus(order.id, 'paid', tableId: order.tableId);

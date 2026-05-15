@@ -18,10 +18,9 @@ class MenuManagementView extends StatelessWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: ElevatedButton.icon(
+                child: ElevatedButton(
                   onPressed: () => _showCategoryDialog(context),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Category'),
+                  child: const Text('Add Category'),
                 ),
               ),
               const Divider(),
@@ -35,13 +34,13 @@ class MenuManagementView extends StatelessWidget {
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit, size: 20),
+                          TextButton(
                             onPressed: () => _showCategoryDialog(context, category: category),
+                            child: const Text('Edit'),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                          TextButton(
                             onPressed: () => provider.deleteCategory(category.id),
+                            child: const Text('Delete', style: TextStyle(color: Colors.red)),
                           ),
                         ],
                       ),
@@ -63,12 +62,11 @@ class MenuManagementView extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('All Menu Items', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                    ElevatedButton.icon(
+                    ElevatedButton(
                       onPressed: provider.categories.isEmpty 
                         ? null 
                         : () => _showMenuItemDialog(context),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add New Item'),
+                      child: const Text('Add New Item'),
                     ),
                   ],
                 ),
@@ -84,19 +82,26 @@ class MenuManagementView extends StatelessWidget {
                     return Card(
                       child: ListTile(
                         title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Category: ${category.name}'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Category: ${category.name}'),
+                            if (item.description != null && item.description!.isNotEmpty)
+                              Text('Desc: ${item.description}', style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+                          ],
+                        ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text('₹${item.price}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                             const SizedBox(width: 16),
-                            IconButton(
-                              icon: const Icon(Icons.edit),
+                            TextButton(
                               onPressed: () => _showMenuItemDialog(context, item: item),
+                              child: const Text('Edit'),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
+                            TextButton(
                               onPressed: () => provider.deleteMenuItem(item.id),
+                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
                             ),
                           ],
                         ),
@@ -145,7 +150,9 @@ class MenuManagementView extends StatelessWidget {
     final provider = context.read<RestaurantProvider>();
     final nameController = TextEditingController(text: item?.name ?? '');
     final priceController = TextEditingController(text: item?.price.toString() ?? '');
+    final descriptionController = TextEditingController(text: item?.description ?? '');
     String? selectedCategoryId = item?.categoryId ?? provider.categories.first.id;
+    String selectedItemType = item?.itemType ?? 'food';
 
     showDialog(
       context: context,
@@ -170,6 +177,19 @@ class MenuManagementView extends StatelessWidget {
                 decoration: const InputDecoration(labelText: 'Price'),
                 keyboardType: TextInputType.number,
               ),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(labelText: 'Description (Optional)'),
+              ),
+              DropdownButtonFormField<String>(
+                value: selectedItemType,
+                items: const [
+                  DropdownMenuItem(value: 'food', child: Text('Food')),
+                  DropdownMenuItem(value: 'drink', child: Text('Drink')),
+                ],
+                onChanged: (val) => setState(() => selectedItemType = val!),
+                decoration: const InputDecoration(labelText: 'Item Type'),
+              ),
             ],
           ),
           actions: [
@@ -177,9 +197,9 @@ class MenuManagementView extends StatelessWidget {
             ElevatedButton(
               onPressed: () {
                 if (item == null) {
-                  provider.addMenuItem(selectedCategoryId!, nameController.text, double.parse(priceController.text));
+                  provider.addMenuItem(selectedCategoryId!, nameController.text, double.parse(priceController.text), descriptionController.text, selectedItemType);
                 } else {
-                  provider.updateMenuItem(item.id, selectedCategoryId!, nameController.text, double.parse(priceController.text));
+                  provider.updateMenuItem(item.id, selectedCategoryId!, nameController.text, double.parse(priceController.text), descriptionController.text, selectedItemType);
                 }
                 Navigator.pop(context);
               },

@@ -47,19 +47,23 @@ class SupabaseService {
     await client.from('categories').delete().eq('id', id);
   }
 
-  Future<void> addMenuItem(String categoryId, String name, double price) async {
+  Future<void> addMenuItem(String categoryId, String name, double price, String? description, String itemType) async {
     await client.from('menu_items').insert({
       'category_id': categoryId,
       'name': name,
       'price': price,
+      'description': description,
+      'item_type': itemType,
     });
   }
 
-  Future<void> updateMenuItem(String id, String categoryId, String name, double price) async {
+  Future<void> updateMenuItem(String id, String categoryId, String name, double price, String? description, String itemType) async {
     await client.from('menu_items').update({
       'category_id': categoryId,
       'name': name,
       'price': price,
+      'description': description,
+      'item_type': itemType,
     }).eq('id', id);
   }
 
@@ -229,6 +233,10 @@ class SupabaseService {
   // --- Table Management ---
 
   Future<void> addTable(String name) async {
+    final response = await client.from('tables').select().eq('name', name).maybeSingle();
+    if (response != null) {
+      throw Exception('Table with name "$name" already exists!');
+    }
     await client.from('tables').insert({
       'name': name,
       'status': 'available',
@@ -241,5 +249,10 @@ class SupabaseService {
 
   Future<void> deleteTable(String id) async {
     await client.from('tables').delete().eq('id', id);
+  }
+
+  Future<void> updateOrderItems(String orderId, List<Map<String, dynamic>> items) async {
+    await client.from('order_items').delete().eq('order_id', orderId);
+    await client.from('order_items').insert(items);
   }
 }

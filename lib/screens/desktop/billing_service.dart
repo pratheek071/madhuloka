@@ -2,14 +2,19 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../models/order_model.dart';
+import '../../models/order_item_model.dart';
 import 'package:intl/intl.dart';
 
 class BillingService {
-  static Future<void> printInvoice(OrderModel order) async {
+  static Future<void> printInvoice(OrderModel order, {String? title, List<OrderItem>? customItems}) async {
     final pdf = pw.Document();
+    final items = customItems ?? order.items;
 
-    // Calculate mock tax breakdown (assuming total is inclusive of 5% GST)
-    final double total = order.totalAmount;
+    // Calculate total based on items used
+    final double total = customItems != null 
+        ? items.fold(0.0, (sum, item) => sum + (item.price * item.quantity))
+        : order.totalAmount;
+        
     final double subtotal = total / 1.05;
     final double gst = total - subtotal;
     final double cgst = gst / 2;
@@ -38,6 +43,13 @@ class BillingService {
               pw.Center(
                 child: pw.Text('Ph: 9876543210', style: const pw.TextStyle(fontSize: 8)),
               ),
+              if (title != null) ...[
+                pw.SizedBox(height: 5),
+                pw.Center(
+                  child: pw.Text(title.toUpperCase(), 
+                    style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                ),
+              ],
               pw.SizedBox(height: 10),
               
               // Bill Info
@@ -63,7 +75,7 @@ class BillingService {
               pw.Text('------------------------------------------', style: const pw.TextStyle(fontSize: 10)),
               
               // Items List
-              ...order.items.map((item) => pw.Padding(
+              ...items.map((item) => pw.Padding(
                 padding: const pw.EdgeInsets.symmetric(vertical: 2),
                 child: pw.Row(
                   children: [

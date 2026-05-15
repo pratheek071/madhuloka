@@ -19,6 +19,43 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
     Future.microtask(() => context.read<RestaurantProvider>().fetchData());
   }
 
+  void _showAddTableDialog(BuildContext context) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add New Table'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: 'Table Name (e.g., 1.1 or 10)'),
+          keyboardType: TextInputType.text,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                try {
+                  await SupabaseService().addTable(name);
+                  Navigator.pop(context);
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error adding table: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -99,6 +136,11 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
             },
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddTableDialog(context),
+        backgroundColor: Colors.green,
+        child: const Icon(Icons.add),
       ),
     );
   }

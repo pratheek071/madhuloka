@@ -31,13 +31,10 @@ async function initApp() {
 
     var params = new URLSearchParams(window.location.search);
     tableId = params.get('table');
-    isViewOnly = params.get('mode') === 'view';
-    isNamedMode = params.get('mode') === 'named';
-
-    if (!tableId && !isViewOnly && !isNamedMode) {
-      showError('No table specified. Please scan the QR code at your table.');
-      return;
-    }
+    isViewOnly = true;
+    isNamedMode = false;
+    
+    console.log('Forced View Only Mode');
 
     console.log('Table ID:', tableId);
     console.log('View Only Mode:', isViewOnly);
@@ -230,17 +227,14 @@ function renderMenuItem(item, index) {
     controls += '<button class="btn-qty btn-add" onclick="addToCart(\'' + item.id + '\')">+</button>';
   }
 
-  var emoji = getEmojiForItem(item.name);
+  var cleanName = item.name.replace(/[^\x00-\x7F]/g, "").trim();
 
   return '<div class="menu-item ' + inCartClass + '" id="item-' + item.id + '" style="animation-delay: ' + (index * 0.03) + 's">' +
-    '<div style="display: flex; align-items: center; gap: 12px;">' +
-      '<div style="font-size: 28px; background: rgba(255,255,255,0.05); width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px;">' + emoji + '</div>' +
-      '<div class="menu-item-info">' +
-        '<div class="menu-item-name">' + escapeHtml(item.name) + '</div>' +
-        '<div class="menu-item-price">₹' + Number(item.price).toFixed(2) + '</div>' +
-      '</div>' +
+    '<div class="menu-item-info">' +
+      '<div class="menu-item-name">' + escapeHtml(cleanName) + '</div>' +
+      (item.description ? '<div class="menu-item-description">' + escapeHtml(item.description) + '</div>' : '') +
     '</div>' +
-    '<div class="menu-item-controls">' + controls + '</div>' +
+    '<div class="menu-item-price" style="font-size: 1.2rem; font-weight: 800; color: var(--accent);">₹' + Number(item.price).toFixed(2) + '</div>' +
   '</div>';
 }
 

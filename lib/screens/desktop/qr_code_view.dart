@@ -77,74 +77,7 @@ class _QrCodeViewState extends State<QrCodeView> {
                   foregroundColor: Colors.white,
                 ),
               ),
-              const SizedBox(width: 12),
-              // Shared QRs Section
-              ...['Counter', 'Centre 1', 'Centre 2', 'Centre 3'].map((name) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      final table = provider.tables.firstWhere(
-                        (t) => t.name.trim().toLowerCase() == name.toLowerCase(),
-                        orElse: () => RestaurantTable(id: '', name: name, status: 'available'), // Temporary fallback
-                      );
-                      if (table.id.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Please create a table named "$name" first.')),
-                        );
-                        return;
-                      }
-                      _printSharedQr(table);
-                    },
-                    icon: const Icon(Icons.people),
-                    label: Text(name),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                );
-              }).toList(),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: () => _printAllQrCodes(provider.tables),
-                icon: const Icon(Icons.print),
-                label: const Text('Print All QR Codes'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepOrange,
-                  foregroundColor: Colors.white,
-                ),
-              ),
             ],
-          ),
-        ),
-        // QR Code Grid
-        Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.all(24),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 24,
-              mainAxisSpacing: 24,
-              childAspectRatio: 0.75,
-            ),
-            itemCount: tables.length + 1,
-            itemBuilder: (context, index) {
-              if (index < tables.length) {
-                final table = tables[index];
-                return _QrCard(
-                  table: table,
-                  orderUrl: _getOrderUrl(table.id),
-                  onPrint: () => _printSingleQr(table),
-                  onEdit: () => _showTableDialog(context, table: table),
-                  onDelete: () => provider.deleteTable(table.id),
-                );
-              } else {
-                return _AddTableCard(
-                  onTap: () => _showTableDialog(context),
-                );
-              }
-            },
           ),
         ),
       ],

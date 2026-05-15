@@ -88,7 +88,14 @@ class _MenuScreenState extends State<MenuScreen> {
 
                   return ListTile(
                     title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('₹${item.price.toStringAsFixed(2)}'),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (item.description != null && item.description!.isNotEmpty)
+                          Text(item.description!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text('₹${item.price.toStringAsFixed(2)}'),
+                      ],
+                    ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [

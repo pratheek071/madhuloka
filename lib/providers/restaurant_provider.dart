@@ -168,18 +168,18 @@ class RestaurantProvider with ChangeNotifier {
     await fetchData();
   }
 
-  Future<void> addMenuItem(String categoryId, String name, double price) async {
+  Future<void> addMenuItem(String categoryId, String name, double price, String? description, String itemType) async {
     try {
-      await _service.addMenuItem(categoryId, name, price);
+      await _service.addMenuItem(categoryId, name, price, description, itemType);
       await fetchData();
     } catch (e) {
       debugPrint("Error adding menu item: $e");
     }
   }
 
-  Future<void> updateMenuItem(String id, String categoryId, String name, double price) async {
+  Future<void> updateMenuItem(String id, String categoryId, String name, double price, String? description, String itemType) async {
     try {
-      await _service.updateMenuItem(id, categoryId, name, price);
+      await _service.updateMenuItem(id, categoryId, name, price, description, itemType);
       await fetchData();
     } catch (e) {
       debugPrint("Error updating menu item: $e");

@@ -4,6 +4,8 @@ class MenuItem {
   final String name;
   final double price;
   final String? imageUrl;
+  final String? description;
+  final String itemType; // 'food' or 'drink'
 
   MenuItem({
     required this.id,
@@ -11,6 +13,8 @@ class MenuItem {
     required this.name,
     required this.price,
     this.imageUrl,
+    this.description,
+    required this.itemType,
   });
 
   factory MenuItem.fromJson(Map<String, dynamic> json) {
@@ -20,6 +24,8 @@ class MenuItem {
       name: json['name'],
       price: (json['price'] as num).toDouble(),
       imageUrl: json['image_url'],
+      description: json['description'],
+      itemType: json['item_type'] ?? 'food',
     );
   }
 
@@ -30,6 +36,8 @@ class MenuItem {
       'name': name,
       'price': price,
       'image_url': imageUrl,
+      'description': description,
+      'item_type': itemType,
     };
   }
 }
