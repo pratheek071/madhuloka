@@ -20,22 +20,38 @@ class BillingService {
     final double cgst = gst / 2;
     final double sgst = cgst;
 
+    // Load logo if exists
+    final logoFile = File('customer_web/MD.png');
+    final logoBytes = logoFile.existsSync() ? logoFile.readAsBytesSync() : null;
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.roll80, // 80mm thermal printer width
         margin: const pw.EdgeInsets.all(10),
         build: (pw.Context context) {
-          return pw.Column(
+            return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
+              // Logo
+              if (logoBytes != null) ...[
+                pw.Center(
+                  child: pw.Container(
+                    width: 60,
+                    height: 60,
+                    child: pw.Image(pw.MemoryImage(logoBytes)),
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+              ],
+              
               // Header
               pw.Center(
                 child: pw.Text('MADHULOKA DINING', 
-                  style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                  style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
               ),
               pw.Center(
                 child: pw.Text('RestoBar & Family Restaurant', 
-                  style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic)),
+                  style: pw.TextStyle(fontSize: 9, fontStyle: pw.FontStyle.italic)),
               ),
               pw.Center(
                 child: pw.Text('123 Main Road, Bangalore', style: const pw.TextStyle(fontSize: 8)),
@@ -63,13 +79,13 @@ class BillingService {
               pw.SizedBox(height: 5),
               pw.Text('------------------------------------------', style: const pw.TextStyle(fontSize: 10)), // Dotted line effect
               
-              // Item Headers
+              // Headings
               pw.Row(
                 children: [
-                  pw.Expanded(flex: 3, child: pw.Text('Item', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                  pw.Expanded(flex: 3, child: pw.Text('Item Name', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
                   pw.Expanded(child: pw.Text('Qty', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
-                  pw.Expanded(child: pw.Text('Rate', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
-                  pw.Expanded(child: pw.Text('Amt', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                  pw.Expanded(child: pw.Text('Price', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                  pw.Expanded(child: pw.Text('Total', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
                 ],
               ),
               pw.Text('------------------------------------------', style: const pw.TextStyle(fontSize: 10)),
@@ -127,6 +143,9 @@ class BillingService {
               // Footer
               pw.Center(
                 child: pw.Text('THANK YOU!', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.Center(
+                child: pw.Text('MADHULOKA DINING', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
               ),
               pw.Center(
                 child: pw.Text('Please Visit Again', style: const pw.TextStyle(fontSize: 9)),
