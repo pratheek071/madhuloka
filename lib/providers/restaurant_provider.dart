@@ -74,7 +74,11 @@ class RestaurantProvider with ChangeNotifier {
     double total = 0;
     _cart.forEach((itemId, qty) {
       final item = _menuItems.firstWhere((m) => m.id == itemId);
-      total += item.price * qty;
+      double itemTotal = item.price * qty;
+      if (item.itemType.toLowerCase() == 'food') {
+        itemTotal *= 1.05; // Add 5% tax on top for food
+      }
+      total += itemTotal;
     });
     return total;
   }

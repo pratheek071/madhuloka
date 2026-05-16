@@ -269,6 +269,7 @@ class _OrderDetailsView extends StatelessWidget {
       'quantity': item.quantity,
       'price': item.price,
       'name': item.itemName,
+      'item_type': item.itemType,
     }).toList();
 
     String? selectedMenuItemId = menuItems.isNotEmpty ? menuItems.first.id : null;
@@ -309,6 +310,7 @@ class _OrderDetailsView extends StatelessWidget {
                                 'quantity': 1,
                                 'price': item.price,
                                 'name': item.name,
+                                'item_type': item.itemType,
                               });
                             }
                           });
@@ -371,7 +373,13 @@ class _OrderDetailsView extends StatelessWidget {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
-                final double newTotal = editedItems.fold(0, (sum, item) => sum + (item['price'] * item['quantity']));
+                final double newTotal = editedItems.fold(0.0, (sum, item) {
+                  double itemPrice = item['price'] * item['quantity'];
+                  if (item['item_type'].toString().toLowerCase() == 'food') {
+                    itemPrice *= 1.05;
+                  }
+                  return sum + itemPrice;
+                });
                 final itemsToSave = editedItems.map((item) => {
                   'order_id': order.id,
                   'menu_item_id': item['menu_item_id'],
@@ -584,9 +592,8 @@ class _OrderDetailsView extends StatelessWidget {
                 final drinkTotal = order.items.where((item) => item.itemType.toLowerCase() == 'drink')
                     .fold(0.0, (sum, item) => sum + (item.price * item.quantity));
                 
-                final foodSubtotal = foodTotal / 1.05;
-                final gstAmount = foodTotal - foodSubtotal;
-                final subtotal = foodSubtotal + drinkTotal;
+                final gstAmount = foodTotal * 0.05;
+                final subtotal = foodTotal + drinkTotal;
 
                 return Column(
                   children: [
@@ -600,7 +607,7 @@ class _OrderDetailsView extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Grand Total', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                        Text('₹${order.totalAmount.toStringAsFixed(2)}', 
+                        Text('₹${(subtotal + gstAmount).toStringAsFixed(2)}', 
                           style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.black)),
                       ],
                     ),

@@ -16,12 +16,11 @@ class BillingService {
     final double drinkTotal = items.where((item) => item.itemType.toLowerCase() == 'drink')
         .fold(0.0, (sum, item) => sum + (item.price * item.quantity));
         
-    final double foodSubtotal = foodTotal / 1.05;
-    final double gstAmount = foodTotal - foodSubtotal;
-    final double subtotal = foodSubtotal + drinkTotal;
+    final double gstAmount = foodTotal * 0.05;
+    final double subtotal = foodTotal + drinkTotal;
     final double cgst = gstAmount / 2;
     final double sgst = cgst;
-    final double total = foodTotal + drinkTotal;
+    final double total = subtotal + gstAmount;
 
     // Load logo if exists
     final logoFile = File('customer_web/MD.png');
