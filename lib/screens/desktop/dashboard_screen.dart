@@ -371,6 +371,7 @@ class _OrderDetailsView extends StatelessWidget {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
+                final double newTotal = editedItems.fold(0, (sum, item) => sum + (item['price'] * item['quantity']));
                 final itemsToSave = editedItems.map((item) => {
                   'order_id': order.id,
                   'menu_item_id': item['menu_item_id'],
@@ -378,7 +379,7 @@ class _OrderDetailsView extends StatelessWidget {
                   'price': item['price'],
                 }).toList();
                 
-                await SupabaseService().updateOrderItems(order.id, itemsToSave);
+                await SupabaseService().updateOrderItems(order.id, itemsToSave, newTotal);
                 provider.fetchData();
                 Navigator.pop(context);
                 onStatusUpdate();
@@ -387,6 +388,44 @@ class _OrderDetailsView extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showPaymentMethodDialog(BuildContext context, OrderModel order, {bool shouldPrint = false}) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Payment Method'),
+        content: const Text('How would you like to settle this bill?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(context);
+              if (shouldPrint) await BillingService.printInvoice(order);
+              await SupabaseService().updateOrderStatus(order.id, 'paid', tableId: order.tableId, paymentMethod: 'Cash');
+              onStatusUpdate();
+            },
+            icon: const Icon(Icons.money),
+            label: const Text('Cash'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(context);
+              if (shouldPrint) await BillingService.printInvoice(order);
+              await SupabaseService().updateOrderStatus(order.id, 'paid', tableId: order.tableId, paymentMethod: 'Online');
+              onStatusUpdate();
+            },
+            icon: const Icon(Icons.payment),
+            label: const Text('Online'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+          ),
+        ],
       ),
     );
   }
@@ -473,20 +512,13 @@ class _OrderDetailsView extends StatelessWidget {
                     color: Colors.purple,
                   ),
                   _ActionButton(
-                    onPressed: () async {
-                      await BillingService.printInvoice(order);
-                      await service.updateOrderStatus(order.id, 'paid', tableId: order.tableId);
-                      onStatusUpdate();
-                    },
+                    onPressed: () => _showPaymentMethodDialog(context, order, shouldPrint: true),
                     icon: Icons.print_outlined,
                     label: 'Print & Settle',
                     color: Colors.blue,
                   ),
                   _ActionButton(
-                    onPressed: () async {
-                      await service.updateOrderStatus(order.id, 'paid', tableId: order.tableId);
-                      onStatusUpdate();
-                    },
+                    onPressed: () => _showPaymentMethodDialog(context, order),
                     icon: Icons.check_circle_outline,
                     label: 'Mark Paid',
                     color: Colors.green,
@@ -545,19 +577,22 @@ class _OrderDetailsView extends StatelessWidget {
               color: Colors.grey.shade50,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
               children: [
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                _TotalRow(label: 'Subtotal', value: order.totalAmount / 1.05),
+                const SizedBox(height: 8),
+                _TotalRow(label: 'CGST (2.5%)', value: (order.totalAmount - (order.totalAmount / 1.05)) / 2),
+                const SizedBox(height: 8),
+                _TotalRow(label: 'SGST (2.5%)', value: (order.totalAmount - (order.totalAmount / 1.05)) / 2),
+                const Divider(height: 32),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Billed Amount', style: TextStyle(fontSize: 18, color: Colors.grey)),
-                    SizedBox(height: 4),
-                    Text('Including all taxes', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                    const Text('Grand Total', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                    Text('₹${order.totalAmount.toStringAsFixed(2)}', 
+                      style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.black)),
                   ],
                 ),
-                Text('₹${order.totalAmount.toStringAsFixed(2)}', 
-                  style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.black)),
               ],
             ),
           ),
@@ -621,6 +656,24 @@ class _ActionButton extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 0,
       ),
+    );
+  }
+}
+
+class _TotalRow extends StatelessWidget {
+  final String label;
+  final double value;
+
+  const _TotalRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 16, color: Colors.grey)),
+        Text('₹${value.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+      ],
     );
   }
 }

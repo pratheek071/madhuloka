@@ -130,10 +130,13 @@ class SupabaseService {
   }
 
   // Update Order Status
-  Future<void> updateOrderStatus(String orderId, String status, {String? tableId}) async {
+  Future<void> updateOrderStatus(String orderId, String status, {String? tableId, String? paymentMethod}) async {
     final Map<String, dynamic> updates = {'status': status};
     if (status == 'paid') {
       updates['completed_at'] = DateTime.now().toIso8601String();
+      if (paymentMethod != null) {
+        updates['payment_method'] = paymentMethod;
+      }
     }
     
     await client.from('orders').update(updates).eq('id', orderId);
@@ -251,8 +254,16 @@ class SupabaseService {
     await client.from('tables').delete().eq('id', id);
   }
 
-  Future<void> updateOrderItems(String orderId, List<Map<String, dynamic>> items) async {
+  Future<void> updateOrderItems(String orderId, List<Map<String, dynamic>> items, double totalAmount) async {
+    // 1. Delete old items
     await client.from('order_items').delete().eq('order_id', orderId);
+    
+    // 2. Insert new items
     await client.from('order_items').insert(items);
+
+    // 3. Update the order total
+    await client.from('orders').update({
+      'total_amount': totalAmount,
+    }).eq('id', orderId);
   }
 }
