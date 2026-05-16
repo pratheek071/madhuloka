@@ -26,6 +26,8 @@ class _SalesReportsViewState extends State<SalesReportsView> {
         children: [
           // Header with Filter
           _buildHeader(context),
+          const SizedBox(height: 16),
+          _buildQuickFilters(context),
           const SizedBox(height: 32),
           
           // Summary Cards
@@ -96,6 +98,79 @@ class _SalesReportsViewState extends State<SalesReportsView> {
         ),
       ],
     );
+  }
+
+  Widget _buildQuickFilters(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _QuickFilterButton(
+            label: 'Today',
+            onTap: () => _updateRange(
+              DateTime.now().copyWith(hour: 0, minute: 0, second: 0),
+              DateTime.now().copyWith(hour: 23, minute: 59, second: 59),
+            ),
+          ),
+          _QuickFilterButton(
+            label: 'Yesterday',
+            onTap: () {
+              final yesterday = DateTime.now().subtract(const Duration(days: 1));
+              _updateRange(
+                yesterday.copyWith(hour: 0, minute: 0, second: 0),
+                yesterday.copyWith(hour: 23, minute: 59, second: 59),
+              );
+            },
+          ),
+          _QuickFilterButton(
+            label: 'This Week',
+            onTap: () {
+              final now = DateTime.now();
+              final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+              _updateRange(
+                startOfWeek.copyWith(hour: 0, minute: 0, second: 0),
+                now.copyWith(hour: 23, minute: 59, second: 59),
+              );
+            },
+          ),
+          _QuickFilterButton(
+            label: 'This Month',
+            onTap: () {
+              final now = DateTime.now();
+              _updateRange(
+                DateTime(now.year, now.month, 1),
+                now.copyWith(hour: 23, minute: 59, second: 59),
+              );
+            },
+          ),
+          _QuickFilterButton(
+            label: 'Last Month',
+            onTap: () {
+              final now = DateTime.now();
+              final firstOfLastMonth = DateTime(now.year, now.month - 1, 1);
+              final lastOfLastMonth = DateTime(now.year, now.month, 0, 23, 59, 59);
+              _updateRange(firstOfLastMonth, lastOfLastMonth);
+            },
+          ),
+          _QuickFilterButton(
+            label: 'This Year',
+            onTap: () {
+              final now = DateTime.now();
+              _updateRange(
+                DateTime(now.year, 1, 1),
+                now.copyWith(hour: 23, minute: 59, second: 59),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _updateRange(DateTime start, DateTime end) {
+    setState(() {
+      _selectedRange = DateTimeRange(start: start, end: end);
+    });
   }
 
   Widget _buildSummaryCards(BuildContext context) {
@@ -372,7 +447,7 @@ class _SalesReportsViewState extends State<SalesReportsView> {
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
       initialDateRange: _selectedRange,
-      firstDate: DateTime(2024),
+      firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 1)),
       builder: (context, child) {
         return Theme(
@@ -493,6 +568,30 @@ class _SourceBadge extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _QuickFilterButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickFilterButton({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: ActionChip(
+        label: Text(label),
+        onPressed: onTap,
+        backgroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: Colors.grey.shade200),
+        ),
       ),
     );
   }
