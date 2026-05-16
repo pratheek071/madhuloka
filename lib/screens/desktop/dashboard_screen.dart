@@ -81,7 +81,7 @@ class _DesktopDashboardState extends State<DesktopDashboard> {
           children: [
             // Sidebar: List of Active Orders
             Container(
-              width: 400,
+              width: 320,
               decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border(right: BorderSide(color: Colors.grey.shade200)),
@@ -616,12 +616,13 @@ class _OrderDetailsView extends StatelessWidget {
                     const SizedBox(height: 8),
                     _TotalRow(label: 'SGST (2.5%)', value: gstAmount / 2),
                     const Divider(height: 32),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         const Text('Grand Total', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                         Text('₹${(subtotal + gstAmount).toStringAsFixed(2)}', 
-                          style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.black)),
+                          style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.black)),
                       ],
                     ),
                   ],
