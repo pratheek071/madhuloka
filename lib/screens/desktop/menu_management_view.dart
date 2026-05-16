@@ -34,13 +34,18 @@ class MenuManagementView extends StatelessWidget {
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          TextButton(
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 20),
                             onPressed: () => _showCategoryDialog(context, category: category),
-                            child: const Text('Edit'),
                           ),
-                          TextButton(
-                            onPressed: () => provider.deleteCategory(category.id),
-                            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                            onPressed: () => _showDeleteConfirmation(
+                              context, 
+                              title: 'Delete Category?',
+                              message: 'Are you sure you want to delete "${category.name}"? This will remove all items in this category.',
+                              onConfirm: () => provider.deleteCategory(category.id),
+                            ),
                           ),
                         ],
                       ),
@@ -95,13 +100,18 @@ class MenuManagementView extends StatelessWidget {
                           children: [
                             Text('₹${item.price}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                             const SizedBox(width: 16),
-                            TextButton(
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined),
                               onPressed: () => _showMenuItemDialog(context, item: item),
-                              child: const Text('Edit'),
                             ),
-                            TextButton(
-                              onPressed: () => provider.deleteMenuItem(item.id),
-                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              onPressed: () => _showDeleteConfirmation(
+                                context, 
+                                title: 'Delete Item?',
+                                message: 'Are you sure you want to delete "${item.itemName}"?',
+                                onConfirm: () => provider.deleteMenuItem(item.id),
+                              ),
                             ),
                           ],
                         ),
@@ -209,6 +219,27 @@ class MenuManagementView extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context, {required String title, required String message, required VoidCallback onConfirm}) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              onConfirm();
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
   }
