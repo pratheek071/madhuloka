@@ -189,7 +189,8 @@ class _SalesReportsViewState extends State<SalesReportsView> {
                   DataColumn(label: Text('SOURCE', style: TextStyle(fontWeight: FontWeight.bold))),
                   DataColumn(label: Text('ITEMS', style: TextStyle(fontWeight: FontWeight.bold))),
                   DataColumn(label: Text('AMOUNT', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text('STATUS', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('PAYMENT', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('DETAILS', style: TextStyle(fontWeight: FontWeight.bold))),
                 ],
                 rows: orders.asMap().entries.map((entry) {
                   final index = entry.key;
@@ -210,10 +211,21 @@ class _SalesReportsViewState extends State<SalesReportsView> {
                       DataCell(Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.green.shade50,
+                          color: (order.paymentMethod?.toLowerCase() == 'online') ? Colors.blue.shade50 : Colors.green.shade50,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Text('PAID', style: TextStyle(color: Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.bold)),
+                        child: Text(
+                          (order.paymentMethod ?? 'PAID').toUpperCase(), 
+                          style: TextStyle(
+                            color: (order.paymentMethod?.toLowerCase() == 'online') ? Colors.blue.shade700 : Colors.green.shade700, 
+                            fontSize: 12, 
+                            fontWeight: FontWeight.bold
+                          ),
+                        ),
+                      )),
+                      DataCell(IconButton(
+                        icon: const Icon(Icons.visibility, color: Colors.deepOrange),
+                        onPressed: () => _showOrderDetailsDialog(context, order),
                       )),
                     ],
                   );
@@ -293,6 +305,66 @@ class _SalesReportsViewState extends State<SalesReportsView> {
           ),
         );
       },
+    );
+  }
+
+  void _showOrderDetailsDialog(BuildContext context, OrderModel order) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(order.isParcel ? 'Parcel Details' : 'Table: ${order.tableName}'),
+            Text(DateFormat('dd MMM, hh:mm a').format(order.completedAt ?? order.createdAt), 
+                 style: const TextStyle(fontSize: 14, color: Colors.grey)),
+          ],
+        ),
+        content: SizedBox(
+          width: 500,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Divider(),
+              ...order.items.map((item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(flex: 3, child: Text(item.itemName, style: const TextStyle(fontWeight: FontWeight.w500))),
+                    Expanded(child: Text('x${item.quantity}', textAlign: TextAlign.center)),
+                    Expanded(child: Text('₹${item.price}', textAlign: TextAlign.right)),
+                    Expanded(child: Text('₹${(item.price * item.quantity).toStringAsFixed(2)}', 
+                             textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold))),
+                  ],
+                ),
+              )),
+              const Divider(height: 32),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Payment Method:', style: TextStyle(color: Colors.grey)),
+                  Text((order.paymentMethod ?? 'Cash').toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Total Amount:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text('₹${order.totalAmount.toStringAsFixed(2)}', 
+                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.deepOrange)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
     );
   }
 
