@@ -52,48 +52,51 @@ class _DigitalMenuViewState extends State<DigitalMenuView> {
             children: [
               // Type Toggle
               Padding(
-                padding: const EdgeInsets.all(24.0),
+                padding: const EdgeInsets.all(16.0),
                 child: Container(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Row(
-                    children: [
-                      _TypeButton(
-                        label: 'FOOD',
-                        isSelected: _selectedType == 'food',
-                        onTap: () => setState(() {
-                          _selectedType = 'food';
-                          _selectedCategoryId = null;
-                        }),
-                      ),
-                      _TypeButton(
-                        label: 'DRINKS',
-                        isSelected: _selectedType == 'drink',
-                        onTap: () => setState(() {
-                          _selectedType = 'drink';
-                          _selectedCategoryId = null;
-                        }),
-                      ),
-                      _TypeButton(
-                        label: 'COCKTAILS',
-                        isSelected: _selectedType == 'cocktail',
-                        onTap: () => setState(() {
-                          _selectedType = 'cocktail';
-                          _selectedCategoryId = null;
-                        }),
-                      ),
-                      _TypeButton(
-                        label: 'MOCKTAILS',
-                        isSelected: _selectedType == 'mocktail',
-                        onTap: () => setState(() {
-                          _selectedType = 'mocktail';
-                          _selectedCategoryId = null;
-                        }),
-                      ),
-                    ],
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _TypeButton(
+                          label: 'FOOD',
+                          isSelected: _selectedType == 'food',
+                          onTap: () => setState(() {
+                            _selectedType = 'food';
+                            _selectedCategoryId = null;
+                          }),
+                        ),
+                        _TypeButton(
+                          label: 'DRINKS',
+                          isSelected: _selectedType == 'drink',
+                          onTap: () => setState(() {
+                            _selectedType = 'drink';
+                            _selectedCategoryId = null;
+                          }),
+                        ),
+                        _TypeButton(
+                          label: 'COCKTAILS',
+                          isSelected: _selectedType == 'cocktail',
+                          onTap: () => setState(() {
+                            _selectedType = 'cocktail';
+                            _selectedCategoryId = null;
+                          }),
+                        ),
+                        _TypeButton(
+                          label: 'MOCKTAILS',
+                          isSelected: _selectedType == 'mocktail',
+                          onTap: () => setState(() {
+                            _selectedType = 'mocktail';
+                            _selectedCategoryId = null;
+                          }),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -210,25 +213,24 @@ class _TypeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)] : null,
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: isSelected ? Colors.deepOrange : Colors.grey,
-              fontSize: 12,
-              letterSpacing: 1.1,
-            ),
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        width: 65,
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)] : null,
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isSelected ? Colors.deepOrange : Colors.grey,
+            fontSize: 9,
+            letterSpacing: 0.5,
           ),
         ),
       ),

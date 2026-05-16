@@ -109,7 +109,7 @@ class MenuManagementView extends StatelessWidget {
                               onPressed: () => _showDeleteConfirmation(
                                 context, 
                                 title: 'Delete Item?',
-                                message: 'Are you sure you want to delete "${item.itemName}"?',
+                                message: 'Are you sure you want to delete "${item.name}"?',
                                 onConfirm: () => provider.deleteMenuItem(item.id),
                               ),
                             ),
