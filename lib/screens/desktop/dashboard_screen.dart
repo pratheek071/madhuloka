@@ -12,6 +12,7 @@ import 'menu_management_view.dart';
 import 'sales_reports_view.dart';
 import 'takeaway_view.dart';
 import 'qr_code_view.dart';
+import 'digital_menu_view.dart';
 
 class DesktopDashboard extends StatefulWidget {
   const DesktopDashboard({super.key});
@@ -27,7 +28,7 @@ class _DesktopDashboardState extends State<DesktopDashboard> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Scaffold(
         backgroundColor: Colors.grey.shade50,
         appBar: AppBar(
@@ -47,6 +48,7 @@ class _DesktopDashboardState extends State<DesktopDashboard> {
               Tab(icon: Icon(Icons.shopping_bag), text: 'Takeaway'),
               Tab(icon: Icon(Icons.qr_code), text: 'QR Codes'),
               Tab(icon: Icon(Icons.restaurant_menu), text: 'Manage Menu'),
+              Tab(icon: Icon(Icons.menu_book), text: 'Digital Menu'),
               Tab(icon: Icon(Icons.bar_chart), text: 'Sales Reports'),
             ],
           ),
@@ -64,6 +66,7 @@ class _DesktopDashboardState extends State<DesktopDashboard> {
             const TakeawayView(),
             const QrCodeView(),
             const MenuManagementView(),
+            const DigitalMenuView(),
             const SalesReportsView(),
           ],
         ),
