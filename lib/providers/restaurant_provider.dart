@@ -75,8 +75,9 @@ class RestaurantProvider with ChangeNotifier {
     _cart.forEach((itemId, qty) {
       final item = _menuItems.firstWhere((m) => m.id == itemId);
       double itemTotal = item.price * qty;
-      if (item.itemType.toLowerCase() == 'food') {
-        itemTotal *= 1.05; // Add 5% tax on top for food
+      final type = item.itemType.toLowerCase();
+      if (type == 'food' || type == 'cocktail' || type == 'mocktail') {
+        itemTotal *= 1.05; // Add 5% tax on top
       }
       total += itemTotal;
     });

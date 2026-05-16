@@ -11,13 +11,15 @@ class BillingService {
     final pdf = pw.Document();
     final items = customItems ?? order.items;
 
-    final double foodTotal = items.where((item) => item.itemType.toLowerCase() == 'food')
-        .fold(0.0, (sum, item) => sum + (item.price * item.quantity));
-    final double drinkTotal = items.where((item) => item.itemType.toLowerCase() == 'drink')
+    final double taxableTotal = items.where((item) {
+          final type = item.itemType.toLowerCase();
+          return type == 'food' || type == 'cocktail' || type == 'mocktail';
+        }).fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+    final double nonTaxableTotal = items.where((item) => item.itemType.toLowerCase() == 'drink')
         .fold(0.0, (sum, item) => sum + (item.price * item.quantity));
         
-    final double gstAmount = foodTotal * 0.05;
-    final double subtotal = foodTotal + drinkTotal;
+    final double gstAmount = taxableTotal * 0.05;
+    final double subtotal = taxableTotal + nonTaxableTotal;
     final double cgst = gstAmount / 2;
     final double sgst = cgst;
     final double total = subtotal + gstAmount;

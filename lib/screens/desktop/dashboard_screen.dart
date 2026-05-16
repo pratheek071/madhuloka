@@ -378,7 +378,8 @@ class _OrderDetailsView extends StatelessWidget {
               onPressed: () async {
                 final double newTotal = editedItems.fold(0.0, (sum, item) {
                   double itemPrice = item['price'] * item['quantity'];
-                  if (item['item_type'].toString().toLowerCase() == 'food') {
+                  final type = item['item_type'].toString().toLowerCase();
+                  if (type == 'food' || type == 'cocktail' || type == 'mocktail') {
                     itemPrice *= 1.05;
                   }
                   return sum + itemPrice;
@@ -453,30 +454,36 @@ class _OrderDetailsView extends StatelessWidget {
           // Detailed Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(order.isParcel 
-                      ? "Parcel: ${order.customerInfo ?? 'Takeaway'}"
-                      : (order.tableName ?? 'Table Order'), 
-                    style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _InfoBadge(label: 'Order ID: ${order.id.substring(0,8)}', icon: Icons.tag),
-                      const SizedBox(width: 12),
-                      _InfoBadge(label: 'Placed: ${DateFormat('hh:mm a').format(order.createdAt)}', icon: Icons.schedule),
-                      const SizedBox(width: 12),
-                      _InfoBadge(
-                        label: order.orderSource.toUpperCase(), 
-                        icon: order.isCustomerOrder ? Icons.phone_android : Icons.person,
-                        color: order.isCustomerOrder ? Colors.blue : Colors.grey,
-                      ),
-                    ],
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(order.isParcel 
+                        ? "Parcel: ${order.customerInfo ?? 'Takeaway'}"
+                        : (order.tableName ?? 'Table Order'), 
+                      style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      children: [
+                        _InfoBadge(label: 'Order ID: ${order.id.substring(0,8)}', icon: Icons.tag),
+                        _InfoBadge(label: 'Placed: ${DateFormat('hh:mm a').format(order.createdAt)}', icon: Icons.schedule),
+                        _InfoBadge(
+                          label: order.orderSource.toUpperCase(), 
+                          icon: order.isCustomerOrder ? Icons.phone_android : Icons.person,
+                          color: order.isCustomerOrder ? Colors.blue : Colors.grey,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 16),
               Wrap(
                 spacing: 16,
                 runSpacing: 16,
@@ -590,13 +597,16 @@ class _OrderDetailsView extends StatelessWidget {
             ),
             child: Builder(
               builder: (context) {
-                final foodTotal = order.items.where((item) => item.itemType.toLowerCase() == 'food')
-                    .fold(0.0, (sum, item) => sum + (item.price * item.quantity));
-                final drinkTotal = order.items.where((item) => item.itemType.toLowerCase() == 'drink')
+                final taxableTotal = order.items.where((item) {
+                    final type = item.itemType.toLowerCase();
+                    return type == 'food' || type == 'cocktail' || type == 'mocktail';
+                  }).fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+                  
+                final nonTaxableTotal = order.items.where((item) => item.itemType.toLowerCase() == 'drink')
                     .fold(0.0, (sum, item) => sum + (item.price * item.quantity));
                 
-                final gstAmount = foodTotal * 0.05;
-                final subtotal = foodTotal + drinkTotal;
+                final gstAmount = taxableTotal * 0.05;
+                final subtotal = taxableTotal + nonTaxableTotal;
 
                 return Column(
                   children: [

@@ -185,7 +185,9 @@ class MenuManagementView extends StatelessWidget {
                 value: selectedItemType,
                 items: const [
                   DropdownMenuItem(value: 'food', child: Text('Food')),
-                  DropdownMenuItem(value: 'drink', child: Text('Drink')),
+                  DropdownMenuItem(value: 'drink', child: Text('Drink (Soft)')),
+                  DropdownMenuItem(value: 'cocktail', child: Text('Cocktail')),
+                  DropdownMenuItem(value: 'mocktail', child: Text('Mocktail')),
                 ],
                 onChanged: (val) => setState(() => selectedItemType = val!),
                 decoration: const InputDecoration(labelText: 'Item Type'),

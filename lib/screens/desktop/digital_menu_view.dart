@@ -77,6 +77,22 @@ class _DigitalMenuViewState extends State<DigitalMenuView> {
                           _selectedCategoryId = null;
                         }),
                       ),
+                      _TypeButton(
+                        label: 'COCKTAILS',
+                        isSelected: _selectedType == 'cocktail',
+                        onTap: () => setState(() {
+                          _selectedType = 'cocktail';
+                          _selectedCategoryId = null;
+                        }),
+                      ),
+                      _TypeButton(
+                        label: 'MOCKTAILS',
+                        isSelected: _selectedType == 'mocktail',
+                        onTap: () => setState(() {
+                          _selectedType = 'mocktail';
+                          _selectedCategoryId = null;
+                        }),
+                      ),
                     ],
                   ),
                 ),
@@ -131,7 +147,7 @@ class _DigitalMenuViewState extends State<DigitalMenuView> {
                     children: [
                       Text(
                         _selectedCategoryId == null 
-                          ? 'All ${_selectedType == 'food' ? 'Dishes' : 'Drinks'}' 
+                          ? 'All ${_selectedType.toUpperCase()}S' 
                           : relevantCategories.firstWhere((c) => c.id == _selectedCategoryId).name,
                         style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                       ),
@@ -243,7 +259,7 @@ class _MenuItemCard extends StatelessWidget {
               Icon(
                 item.itemType.toLowerCase() == 'food' ? Icons.restaurant : Icons.local_bar,
                 size: 20,
-                color: Colors.grey.shade400,
+                color: item.itemType.toLowerCase() == 'cocktail' ? Colors.purple : (item.itemType.toLowerCase() == 'mocktail' ? Colors.pink : Colors.grey.shade400),
               ),
               Text(
                 '₹${item.price}',
