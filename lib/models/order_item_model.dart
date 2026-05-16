@@ -5,6 +5,7 @@ class OrderItem {
   final String itemName; // Added for convenience in UI/Receipt
   final int quantity;
   final double price;
+  final String itemType;
 
   OrderItem({
     required this.id,
@@ -13,6 +14,7 @@ class OrderItem {
     required this.itemName,
     required this.quantity,
     required this.price,
+    this.itemType = 'food',
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class OrderItem {
       itemName: json['menu_items']?['name'] ?? 'Unknown Item',
       quantity: json['quantity'],
       price: (json['price'] as num).toDouble(),
+      itemType: json['menu_items']?['item_type'] ?? 'food',
     );
   }
 

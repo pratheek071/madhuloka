@@ -97,7 +97,7 @@ class SupabaseService {
   Future<OrderModel> getOrderDetails(String orderId) async {
     final response = await client
         .from('orders')
-        .select('*, tables(name), order_items(*, menu_items(name))')
+        .select('*, tables(name), order_items(*, menu_items(name, item_type))')
         .eq('id', orderId)
         .single();
     return OrderModel.fromJson(response);
@@ -152,7 +152,7 @@ class SupabaseService {
   Future<OrderModel?> getActiveOrderForTable(String tableId) async {
     final response = await client
         .from('orders')
-        .select('*, tables(name), order_items(*, menu_items(name))')
+        .select('*, tables(name), order_items(*, menu_items(name, item_type))')
         .eq('table_id', tableId)
         .eq('status', 'pending')
         .maybeSingle();
@@ -218,7 +218,7 @@ class SupabaseService {
   Future<List<OrderModel>> getCompletedOrders({DateTime? start, DateTime? end}) async {
     var query = client
         .from('orders')
-        .select('*, tables(name), order_items(*, menu_items(name))')
+        .select('*, tables(name), order_items(*, menu_items(name, item_type))')
         .eq('status', 'paid');
     
     if (start != null) {

@@ -577,23 +577,36 @@ class _OrderDetailsView extends StatelessWidget {
               color: Colors.grey.shade50,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Column(
-              children: [
-                _TotalRow(label: 'Subtotal', value: order.totalAmount / 1.05),
-                const SizedBox(height: 8),
-                _TotalRow(label: 'CGST (2.5%)', value: (order.totalAmount - (order.totalAmount / 1.05)) / 2),
-                const SizedBox(height: 8),
-                _TotalRow(label: 'SGST (2.5%)', value: (order.totalAmount - (order.totalAmount / 1.05)) / 2),
-                const Divider(height: 32),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Builder(
+              builder: (context) {
+                final foodTotal = order.items.where((item) => item.itemType.toLowerCase() == 'food')
+                    .fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+                final drinkTotal = order.items.where((item) => item.itemType.toLowerCase() == 'drink')
+                    .fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+                
+                final foodSubtotal = foodTotal / 1.05;
+                final gstAmount = foodTotal - foodSubtotal;
+                final subtotal = foodSubtotal + drinkTotal;
+
+                return Column(
                   children: [
-                    const Text('Grand Total', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                    Text('₹${order.totalAmount.toStringAsFixed(2)}', 
-                      style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.black)),
+                    _TotalRow(label: 'Subtotal', value: subtotal),
+                    const SizedBox(height: 8),
+                    _TotalRow(label: 'CGST (2.5%)', value: gstAmount / 2),
+                    const SizedBox(height: 8),
+                    _TotalRow(label: 'SGST (2.5%)', value: gstAmount / 2),
+                    const Divider(height: 32),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Grand Total', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                        Text('₹${order.totalAmount.toStringAsFixed(2)}', 
+                          style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.black)),
+                      ],
+                    ),
                   ],
-                ),
-              ],
+                );
+              }
             ),
           ),
         ],

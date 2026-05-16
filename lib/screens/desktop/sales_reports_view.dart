@@ -32,9 +32,16 @@ class _SalesReportsViewState extends State<SalesReportsView> {
           _buildSummaryCards(context),
           const SizedBox(height: 32),
           
-          // Table Section
+          // Table and Item Breakdown
           Expanded(
-            child: _buildSalesTable(context),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 2, child: _buildSalesTable(context)),
+                const SizedBox(width: 32),
+                Expanded(child: _buildItemBreakdown(context)),
+              ],
+            ),
           ),
         ],
       ),
@@ -116,6 +123,13 @@ class _SalesReportsViewState extends State<SalesReportsView> {
               value: totalOrders.toString(),
               icon: Icons.receipt_long,
               color: Colors.blue,
+            ),
+            const SizedBox(width: 24),
+            _SummaryCard(
+              title: 'Items Sold',
+              value: orders.fold(0, (sum, o) => sum + o.items.fold(0, (isum, i) => isum + i.quantity)).toString(),
+              icon: Icons.inventory_2,
+              color: Colors.teal,
             ),
             const SizedBox(width: 24),
             _SummaryCard(
@@ -206,6 +220,76 @@ class _SalesReportsViewState extends State<SalesReportsView> {
                 }).toList(),
               ),
             ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildItemBreakdown(BuildContext context) {
+    return FutureBuilder<List<OrderModel>>(
+      future: context.read<RestaurantProvider>().getCompletedOrders(
+        start: _selectedRange.start,
+        end: _selectedRange.end,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) return const SizedBox();
+        
+        final orders = snapshot.data ?? [];
+        final Map<String, int> itemCounts = {};
+        
+        for (var order in orders) {
+          for (var item in order.items) {
+            itemCounts[item.itemName] = (itemCounts[item.itemName] ?? 0) + item.quantity;
+          }
+        }
+        
+        final sortedItems = itemCounts.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text('Best Selling Items', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade800)),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: sortedItems.isEmpty 
+                  ? const Center(child: Text('No data'))
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(0),
+                      itemCount: sortedItems.length,
+                      separatorBuilder: (context, index) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final item = sortedItems[index];
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.deepOrange.withOpacity(0.1),
+                            child: Text('${index + 1}', style: const TextStyle(color: Colors.deepOrange, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                          title: Text(item.key, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text('${item.value} sold', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          ),
+                        );
+                      },
+                    ),
+              ),
+            ],
           ),
         );
       },

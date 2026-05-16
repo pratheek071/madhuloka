@@ -11,15 +11,17 @@ class BillingService {
     final pdf = pw.Document();
     final items = customItems ?? order.items;
 
-    // Calculate total based on items used
-    final double total = customItems != null 
-        ? items.fold(0.0, (sum, item) => sum + (item.price * item.quantity))
-        : order.totalAmount;
+    final double foodTotal = items.where((item) => item.itemType.toLowerCase() == 'food')
+        .fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+    final double drinkTotal = items.where((item) => item.itemType.toLowerCase() == 'drink')
+        .fold(0.0, (sum, item) => sum + (item.price * item.quantity));
         
-    final double subtotal = total / 1.05;
-    final double gst = total - subtotal;
-    final double cgst = gst / 2;
+    final double foodSubtotal = foodTotal / 1.05;
+    final double gstAmount = foodTotal - foodSubtotal;
+    final double subtotal = foodSubtotal + drinkTotal;
+    final double cgst = gstAmount / 2;
     final double sgst = cgst;
+    final double total = foodTotal + drinkTotal;
 
     // Load logo if exists
     final logoFile = File('customer_web/MD.png');
