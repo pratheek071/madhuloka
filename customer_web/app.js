@@ -94,7 +94,16 @@ async function initApp() {
     var itemResult = await sb.from('menu_items').select('*').order('name');
     if (itemResult.error) throw itemResult.error;
     menuItems = itemResult.data || [];
-    console.log('Menu items loaded:', menuItems.length);
+    
+    // Sort items inside each category in ascending order of price
+    menuItems.sort(function(a, b) {
+      if (a.price !== b.price) {
+        return a.price - b.price;
+      }
+      return a.name.localeCompare(b.name);
+    });
+    
+    console.log('Menu items loaded and sorted by ascending price:', menuItems.length);
 
     renderCategoryTabs();
     renderMenu();
