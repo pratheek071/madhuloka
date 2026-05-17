@@ -488,10 +488,10 @@ function resetForNewOrder() {
 // ---- HELPERS ----
 function getCategoryPriority(name) {
   var n = name.toLowerCase();
-  if (n.includes('starter')) return 10;
-  if (n.includes('tandoori')) return 20;
-  if (n.includes('chinese')) return 30;
-  if (n.includes('soup')) return 40;
+  if (n.includes('soup')) return 10;
+  if (n.includes('starter')) return 20;
+  if (n.includes('tandoori')) return 30;
+  if (n.includes('chinese')) return 40;
   if (n.includes('main course')) return 50;
   if (n.includes('biryani') || n.includes('biriyani')) return 60;
   if (n.includes('rice')) return 70;
