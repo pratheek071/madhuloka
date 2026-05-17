@@ -80,7 +80,16 @@ async function initApp() {
     var catResult = await sb.from('categories').select('*').order('name');
     if (catResult.error) throw catResult.error;
     categories = catResult.data || [];
-    console.log('Categories loaded:', categories.length);
+    
+    // Sort categories according to custom menu priority (Starters -> Tandoori -> Main Course -> Biryani etc.)
+    categories.sort(function(a, b) {
+      var pA = getCategoryPriority(a.name);
+      var pB = getCategoryPriority(b.name);
+      if (pA !== pB) return pA - pB;
+      return a.name.localeCompare(b.name);
+    });
+    
+    console.log('Categories loaded and sorted by custom menu priority:', categories.length);
 
     var itemResult = await sb.from('menu_items').select('*').order('name');
     if (itemResult.error) throw itemResult.error;
@@ -468,6 +477,24 @@ function resetForNewOrder() {
 }
 
 // ---- HELPERS ----
+function getCategoryPriority(name) {
+  var n = name.toLowerCase();
+  if (n.includes('starter')) return 10;
+  if (n.includes('tandoori')) return 20;
+  if (n.includes('chinese')) return 30;
+  if (n.includes('soup')) return 40;
+  if (n.includes('main course')) return 50;
+  if (n.includes('biryani') || n.includes('biriyani')) return 60;
+  if (n.includes('rice')) return 70;
+  if (n.includes('noodle')) return 80;
+  if (n.includes('bread') || n.includes('roti') || n.includes('naan')) return 90;
+  if (n.includes('salad')) return 100;
+  if (n.includes('mocktail')) return 110;
+  if (n.includes('cocktail')) return 120;
+  if (n.includes('drink')) return 130;
+  return 200; // fallback for others
+}
+
 function escapeHtml(text) {
   var div = document.createElement('div');
   div.textContent = text;
