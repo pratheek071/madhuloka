@@ -77,7 +77,48 @@ class _QrCodeViewState extends State<QrCodeView> {
                   foregroundColor: Colors.white,
                 ),
               ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: () => _printAllQrCodes(tables),
+                icon: const Icon(Icons.print_rounded),
+                label: const Text('Print All QRs'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepOrange,
+                  foregroundColor: Colors.white,
+                ),
+              ),
             ],
+          ),
+        ),
+        // Grid of QR Cards
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.all(24),
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 280,
+              mainAxisSpacing: 24,
+              crossAxisSpacing: 24,
+              childAspectRatio: 0.8,
+            ),
+            itemCount: tables.length + 1,
+            itemBuilder: (context, index) {
+              if (index == tables.length) {
+                return _AddTableCard(
+                  onTap: () => _showTableDialog(context),
+                );
+              }
+
+              final table = tables[index];
+              final orderUrl = _getOrderUrl(table.id);
+
+              return _QrCard(
+                table: table,
+                orderUrl: orderUrl,
+                onPrint: () => _printSingleQr(table),
+                onEdit: () => _showTableDialog(context, table: table),
+                onDelete: () => provider.deleteTable(table.id),
+              );
+            },
           ),
         ),
       ],
@@ -134,33 +175,39 @@ class _QrCodeViewState extends State<QrCodeView> {
 
     // Generate QR image bytes
     final qrImageBytes = await _generateQrImageBytes(url);
-
     final qrImage = pw.MemoryImage(qrImageBytes);
+
+    final qrPageFormat = PdfPageFormat(
+      80 * PdfPageFormat.mm,
+      110 * PdfPageFormat.mm,
+      marginAll: 4 * PdfPageFormat.mm,
+    );
 
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.a6,
+        pageFormat: qrPageFormat,
         build: (pw.Context context) {
           return pw.Center(
             child: pw.Column(
               mainAxisAlignment: pw.MainAxisAlignment.center,
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
               children: [
                 pw.Text('MADHULOKA DINING',
-                    style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 12),
+                    style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 6),
                 pw.Container(
-                  padding: const pw.EdgeInsets.all(8),
+                  padding: const pw.EdgeInsets.all(6),
                   decoration: pw.BoxDecoration(
-                    border: pw.Border.all(width: 2),
-                    borderRadius: pw.BorderRadius.circular(8),
+                    border: pw.Border.all(width: 1.5),
+                    borderRadius: pw.BorderRadius.circular(6),
                   ),
-                  child: pw.Image(qrImage, width: 180, height: 180),
+                  child: pw.Image(qrImage, width: 130, height: 130),
                 ),
-                pw.SizedBox(height: 12),
-                pw.Text(table.name,
-                    style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 4),
-                pw.Text('Scan to Order', style: const pw.TextStyle(fontSize: 12)),
+                pw.SizedBox(height: 6),
+                pw.Text(table.name.toUpperCase(),
+                    style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 2),
+                pw.Text('Scan to Order', style: const pw.TextStyle(fontSize: 9)),
               ],
             ),
           );
@@ -181,30 +228,37 @@ class _QrCodeViewState extends State<QrCodeView> {
     final qrImageBytes = await _generateQrImageBytes(url);
     final qrImage = pw.MemoryImage(qrImageBytes);
 
+    final qrPageFormat = PdfPageFormat(
+      80 * PdfPageFormat.mm,
+      110 * PdfPageFormat.mm,
+      marginAll: 4 * PdfPageFormat.mm,
+    );
+
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.a6,
+        pageFormat: qrPageFormat,
         build: (pw.Context context) {
           return pw.Center(
             child: pw.Column(
               mainAxisAlignment: pw.MainAxisAlignment.center,
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
               children: [
                 pw.Text('MADHULOKA DINING',
-                    style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 12),
+                    style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 6),
                 pw.Container(
-                  padding: const pw.EdgeInsets.all(8),
+                  padding: const pw.EdgeInsets.all(6),
                   decoration: pw.BoxDecoration(
-                    border: pw.Border.all(width: 2),
-                    borderRadius: pw.BorderRadius.circular(8),
+                    border: pw.Border.all(width: 1.5),
+                    borderRadius: pw.BorderRadius.circular(6),
                   ),
-                  child: pw.Image(qrImage, width: 180, height: 180),
+                  child: pw.Image(qrImage, width: 130, height: 130),
                 ),
-                pw.SizedBox(height: 12),
+                pw.SizedBox(height: 6),
                 pw.Text('SCAN TO VIEW MENU',
-                    style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue)),
-                pw.SizedBox(height: 4),
-                pw.Text('View Only Mode', style: const pw.TextStyle(fontSize: 12)),
+                    style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.blue)),
+                pw.SizedBox(height: 2),
+                pw.Text('View Only Mode', style: const pw.TextStyle(fontSize: 9)),
               ],
             ),
           );
@@ -226,31 +280,38 @@ class _QrCodeViewState extends State<QrCodeView> {
     final qrImageBytes = await _generateQrImageBytes(namedUrl);
     final qrImage = pw.MemoryImage(qrImageBytes);
 
+    final qrPageFormat = PdfPageFormat(
+      80 * PdfPageFormat.mm,
+      115 * PdfPageFormat.mm,
+      marginAll: 4 * PdfPageFormat.mm,
+    );
+
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.a6,
+        pageFormat: qrPageFormat,
         build: (pw.Context context) {
           return pw.Center(
             child: pw.Column(
               mainAxisAlignment: pw.MainAxisAlignment.center,
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
               children: [
                 pw.Text('MADHULOKA DINING',
-                    style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 12),
+                    style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 6),
                 pw.Container(
-                  padding: const pw.EdgeInsets.all(8),
+                  padding: const pw.EdgeInsets.all(6),
                   decoration: pw.BoxDecoration(
-                    border: pw.Border.all(width: 2),
-                    borderRadius: pw.BorderRadius.circular(8),
+                    border: pw.Border.all(width: 1.5),
+                    borderRadius: pw.BorderRadius.circular(6),
                   ),
-                  child: pw.Image(qrImage, width: 180, height: 180),
+                  child: pw.Image(qrImage, width: 120, height: 120),
                 ),
-                pw.SizedBox(height: 12),
+                pw.SizedBox(height: 6),
                 pw.Text('SCAN TO ORDER - ${table.name.toUpperCase()}',
-                    style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.green)),
-                pw.SizedBox(height: 4),
-                pw.Text('Enter your name to order', style: const pw.TextStyle(fontSize: 10)),
-                pw.Text('Each person gets a separate bill', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
+                    style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.green)),
+                pw.SizedBox(height: 2),
+                pw.Text('Enter your name to order', style: const pw.TextStyle(fontSize: 8)),
+                pw.Text('Each person gets a separate bill', style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey)),
               ],
             ),
           );
@@ -268,6 +329,11 @@ class _QrCodeViewState extends State<QrCodeView> {
     if (tables.isEmpty) return;
 
     final pdf = pw.Document();
+    final qrPageFormat = PdfPageFormat(
+      80 * PdfPageFormat.mm,
+      110 * PdfPageFormat.mm,
+      marginAll: 4 * PdfPageFormat.mm,
+    );
 
     for (final table in tables) {
       final url = _getOrderUrl(table.id);
@@ -276,28 +342,29 @@ class _QrCodeViewState extends State<QrCodeView> {
 
       pdf.addPage(
         pw.Page(
-          pageFormat: PdfPageFormat.a6,
+          pageFormat: qrPageFormat,
           build: (pw.Context context) {
             return pw.Center(
               child: pw.Column(
                 mainAxisAlignment: pw.MainAxisAlignment.center,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
                   pw.Text('MADHULOKA DINING',
-                      style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                  pw.SizedBox(height: 12),
+                      style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 6),
                   pw.Container(
-                    padding: const pw.EdgeInsets.all(8),
+                    padding: const pw.EdgeInsets.all(6),
                     decoration: pw.BoxDecoration(
-                      border: pw.Border.all(width: 2),
-                      borderRadius: pw.BorderRadius.circular(8),
+                      border: pw.Border.all(width: 1.5),
+                      borderRadius: pw.BorderRadius.circular(6),
                     ),
-                    child: pw.Image(qrImage, width: 180, height: 180),
+                    child: pw.Image(qrImage, width: 130, height: 130),
                   ),
-                  pw.SizedBox(height: 12),
-                  pw.Text(table.name,
-                      style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-                  pw.SizedBox(height: 4),
-                  pw.Text('Scan to Order', style: const pw.TextStyle(fontSize: 12)),
+                  pw.SizedBox(height: 6),
+                  pw.Text(table.name.toUpperCase(),
+                      style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 2),
+                  pw.Text('Scan to Order', style: const pw.TextStyle(fontSize: 9)),
                 ],
               ),
             );
