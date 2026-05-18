@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -25,8 +26,13 @@ class BillingService {
     final double total = subtotal + gstAmount;
 
     // Load logo if exists
-    final logoFile = File('customer_web/MD.png');
-    final logoBytes = logoFile.existsSync() ? logoFile.readAsBytesSync() : null;
+    Uint8List? logoBytes;
+    try {
+      final logoFile = File('customer_web/MD.png');
+      if (logoFile.existsSync()) {
+        logoBytes = logoFile.readAsBytesSync();
+      }
+    } catch (_) {}
 
     pdf.addPage(
       pw.Page(

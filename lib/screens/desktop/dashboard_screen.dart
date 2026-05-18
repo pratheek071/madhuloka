@@ -263,6 +263,28 @@ class _OrderDetailsView extends StatelessWidget {
 
   const _OrderDetailsView({required this.order, required this.onStatusUpdate});
 
+  Future<void> _safePrint(BuildContext context, Future<void> Function() printFn) async {
+    try {
+      await printFn();
+    } catch (e) {
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Printing Failed'),
+            content: Text('Could not complete printing: $e\n\nPlease ensure your printer is connected, configured, and turned on.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
   void _showEditOrderDialog(BuildContext context, OrderModel order) {
     final provider = context.read<RestaurantProvider>();
     final menuItems = provider.menuItems;
@@ -418,7 +440,20 @@ class _OrderDetailsView extends StatelessWidget {
           ElevatedButton.icon(
             onPressed: () async {
               Navigator.pop(context);
-              if (shouldPrint) await BillingService.printInvoice(order);
+              if (shouldPrint) {
+                try {
+                  await BillingService.printInvoice(order);
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Settle succeeded but print failed: $e. Check printer connection.'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                  }
+                }
+              }
               await SupabaseService().updateOrderStatus(order.id, 'paid', tableId: order.tableId, paymentMethod: 'Cash');
               onStatusUpdate();
             },
@@ -429,7 +464,20 @@ class _OrderDetailsView extends StatelessWidget {
           ElevatedButton.icon(
             onPressed: () async {
               Navigator.pop(context);
-              if (shouldPrint) await BillingService.printInvoice(order);
+              if (shouldPrint) {
+                try {
+                  await BillingService.printInvoice(order);
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Settle succeeded but print failed: $e. Check printer connection.'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                  }
+                }
+              }
               await SupabaseService().updateOrderStatus(order.id, 'paid', tableId: order.tableId, paymentMethod: 'Online');
               onStatusUpdate();
             },
@@ -495,39 +543,42 @@ class _OrderDetailsView extends StatelessWidget {
                     color: Colors.orange,
                   ),
                   _ActionButton(
-                    onPressed: () async {
-                      final provider = context.read<RestaurantProvider>();
+                    onPressed: () => _safePrint(context, () async {
                       final foodItems = order.items.where((item) {
-                        final menuItem = provider.menuItems.firstWhere((m) => m.id == item.menuItemId, orElse: () => MenuItem(id: '', categoryId: '', name: '', price: 0, itemType: 'food'));
-                        return menuItem.itemType.toLowerCase() == 'food';
+                        final type = item.itemType.toLowerCase();
+                        return type == 'food';
                       }).toList();
                       
                       // Fallback: If no items are categorized as drinks, print all items as food
                       final hasDrinks = order.items.any((item) {
-                        final menuItem = provider.menuItems.firstWhere((m) => m.id == item.menuItemId, orElse: () => MenuItem(id: '', categoryId: '', name: '', price: 0, itemType: 'food'));
-                        return menuItem.itemType.toLowerCase() == 'drink';
+                        final type = item.itemType.toLowerCase();
+                        return type == 'drink' || type == 'cocktail' || type == 'mocktail';
                       });
                       
                       final itemsToPrint = !hasDrinks ? order.items : foodItems;
-                      
                       await BillingService.printInvoice(order, title: 'KOT - FOOD', customItems: itemsToPrint);
-                    },
+                    }),
                     icon: Icons.restaurant,
                     label: 'Print Food',
                     color: Colors.brown,
                   ),
                   _ActionButton(
-                    onPressed: () async {
-                      final provider = context.read<RestaurantProvider>();
+                    onPressed: () => _safePrint(context, () async {
                       final drinkItems = order.items.where((item) {
-                        final menuItem = provider.menuItems.firstWhere((m) => m.id == item.menuItemId, orElse: () => MenuItem(id: '', categoryId: '', name: '', price: 0, itemType: 'food'));
-                        return menuItem.itemType.toLowerCase() == 'drink';
+                        final type = item.itemType.toLowerCase();
+                        return type == 'drink' || type == 'cocktail' || type == 'mocktail';
                       }).toList();
                       await BillingService.printInvoice(order, title: 'BOT - DRINKS', customItems: drinkItems);
-                    },
+                    }),
                     icon: Icons.local_bar,
                     label: 'Print Drinks',
                     color: Colors.purple,
+                  ),
+                  _ActionButton(
+                    onPressed: () => _safePrint(context, () => BillingService.printInvoice(order)),
+                    icon: Icons.print,
+                    label: 'Print Bill',
+                    color: Colors.teal,
                   ),
                   _ActionButton(
                     onPressed: () => _showPaymentMethodDialog(context, order, shouldPrint: true),
