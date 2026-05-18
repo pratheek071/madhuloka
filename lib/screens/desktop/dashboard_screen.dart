@@ -23,7 +23,15 @@ class DesktopDashboard extends StatefulWidget {
 
 class _DesktopDashboardState extends State<DesktopDashboard> {
   final SupabaseService _service = SupabaseService();
-  OrderModel? _selectedOrder;
+  String? _selectedOrderId;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<RestaurantProvider>().fetchData();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -77,92 +85,109 @@ class _DesktopDashboardState extends State<DesktopDashboard> {
   Widget _buildLiveOrdersView() {
     return Consumer<RestaurantProvider>(
       builder: (context, provider, child) {
-        return Row(
-          children: [
-            // Sidebar: List of Active Orders
-            Container(
-              width: 320,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border(right: BorderSide(color: Colors.grey.shade200)),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    alignment: Alignment.centerLeft,
-                    child: const Text('Active Sessions', 
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        return StreamBuilder<List<OrderModel>>(
+          stream: _service.watchActiveOrders(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final orders = snapshot.data ?? [];
+            
+            // Auto-clear selection if the selected order is no longer pending/active
+            if (_selectedOrderId != null && !orders.any((o) => o.id == _selectedOrderId)) {
+              _selectedOrderId = null;
+            }
+
+            return Row(
+              children: [
+                // Sidebar: List of Active Orders
+                Container(
+                  width: 320,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border(right: BorderSide(color: Colors.grey.shade200)),
                   ),
-                  Expanded(
-                    child: StreamBuilder<List<OrderModel>>(
-                      stream: _service.watchActiveOrders(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-                        
-                        final orders = snapshot.data ?? [];
-                        if (orders.isEmpty) {
-                          return _buildEmptyState('No active orders');
-                        }
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        alignment: Alignment.centerLeft,
+                        child: const Text('Active Sessions', 
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      ),
+                      Expanded(
+                        child: orders.isEmpty
+                            ? _buildEmptyState('No active orders')
+                            : ListView.builder(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                itemCount: orders.length,
+                                itemBuilder: (context, index) {
+                                  final order = orders[index];
+                                  final isSelected = _selectedOrderId == order.id;
+                                  
+                                  // Table Name Lookup
+                                  String tableName = 'Table';
+                                  if (order.isParcel) {
+                                    tableName = "PARCEL: ${order.customerInfo ?? 'Guest'}";
+                                  } else {
+                                    final table = provider.tables.firstWhere(
+                                      (t) => t.id == order.tableId,
+                                      orElse: () => RestaurantTable(id: '', name: 'Table', status: ''),
+                                    );
+                                    tableName = table.name == 'Table' ? 'Table ${order.tableId?.substring(0,4) ?? "Unk"}' : table.name;
+                                  }
 
-                        return ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: orders.length,
-                          itemBuilder: (context, index) {
-                            final order = orders[index];
-                            final isSelected = _selectedOrder?.id == order.id;
-                            
-                            // Table Name Lookup
-                            String tableName = 'Table';
-                            if (order.isParcel) {
-                              tableName = "PARCEL: ${order.customerInfo ?? 'Guest'}";
-                            } else {
-                              final table = provider.tables.firstWhere(
-                                (t) => t.id == order.tableId,
-                                orElse: () => RestaurantTable(id: '', name: 'Table', status: ''),
-                              );
-                              tableName = table.name == 'Table' ? 'Table ${order.tableId?.substring(0,4) ?? "Unk"}' : table.name;
-                            }
-
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _OrderSidebarCard(
-                                order: order,
-                                tableName: tableName,
-                                isSelected: isSelected,
-                                onTap: () async {
-                                  final details = await _service.getOrderDetails(order.id);
-                                  setState(() {
-                                    _selectedOrder = details;
-                                  });
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _OrderSidebarCard(
+                                      order: order,
+                                      tableName: tableName,
+                                      isSelected: isSelected,
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedOrderId = order.id;
+                                        });
+                                      },
+                                    ),
+                                  );
                                 },
                               ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Main View: Order Details & Billing
+                Expanded(
+                  child: _selectedOrderId == null
+                      ? _buildEmptyState('Select an order to view details')
+                      : FutureBuilder<OrderModel>(
+                          // Key based on order ID and the orders list state hash/total changes to trigger a reload when waiter app updates the order items
+                          key: ValueKey('$_selectedOrderId-${orders.map((o) => o.totalAmount).join("-")}'),
+                          future: _service.getOrderDetails(_selectedOrderId!),
+                          builder: (context, detailsSnapshot) {
+                            if (detailsSnapshot.connectionState == ConnectionState.waiting && !detailsSnapshot.hasData) {
+                              return const Center(child: CircularProgressIndicator());
+                            }
+                            if (!detailsSnapshot.hasData) {
+                              return _buildEmptyState('Select an order to view details');
+                            }
+                            final detailedOrder = detailsSnapshot.data!;
+                            return _OrderDetailsView(
+                              order: detailedOrder,
+                              onStatusUpdate: () {
+                                setState(() {
+                                  _selectedOrderId = null;
+                                });
+                              },
                             );
                           },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Main View: Order Details & Billing
-            Expanded(
-              child: _selectedOrder == null
-                  ? _buildEmptyState('Select an order to view details')
-                  : _OrderDetailsView(
-                      order: _selectedOrder!,
-                      onStatusUpdate: () {
-                        setState(() {
-                          _selectedOrder = null;
-                        });
-                      },
-                    ),
-            ),
-          ],
+                        ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -493,6 +518,19 @@ class _OrderDetailsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final service = SupabaseService();
+    final provider = context.watch<RestaurantProvider>();
+
+    // Friendly Table Name Lookup
+    String displayTableName = 'Table Order';
+    if (order.isParcel) {
+      displayTableName = "Parcel: ${order.customerInfo ?? 'Takeaway'}";
+    } else {
+      final table = provider.tables.firstWhere(
+        (t) => t.id == order.tableId,
+        orElse: () => RestaurantTable(id: '', name: 'Table Order', status: ''),
+      );
+      displayTableName = table.name == 'Table Order' ? 'Table ${order.tableId?.substring(0,4) ?? "Unk"}' : table.name;
+    }
 
     return Padding(
       padding: const EdgeInsets.all(48.0),
@@ -508,9 +546,7 @@ class _OrderDetailsView extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(order.isParcel 
-                        ? "Parcel: ${order.customerInfo ?? 'Takeaway'}"
-                        : (order.tableName ?? 'Table Order'), 
+                    Text(displayTableName, 
                       style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
                       overflow: TextOverflow.ellipsis,
                     ),
