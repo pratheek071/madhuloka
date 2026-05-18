@@ -29,6 +29,14 @@ class RestaurantProvider with ChangeNotifier {
 
     try {
       _tables = await _service.getTables();
+      _tables.sort((a, b) {
+        final double? numA = double.tryParse(a.name);
+        final double? numB = double.tryParse(b.name);
+        if (numA != null && numB != null) {
+          return numA.compareTo(numB);
+        }
+        return a.name.compareTo(b.name);
+      });
       _categories = await _service.getCategories();
       _menuItems = await _service.getMenuItems();
     } catch (e) {

@@ -55,71 +55,121 @@ class _MenuScreenState extends State<MenuScreen> {
               },
             ),
           ],
-          bottom: TabBar(
-            isScrollable: true,
-            tabs: [
-              ...provider.categories.map((c) => Tab(text: c.name)),
-              const Tab(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.receipt_long, size: 16),
-                    SizedBox(width: 8),
-                    Text('Ordered Items'),
+          bottom: (_isSearching && _searchQuery.isNotEmpty)
+              ? null
+              : TabBar(
+                  isScrollable: true,
+                  tabs: [
+                    ...provider.categories.map((c) => Tab(text: c.name)),
+                    const Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.receipt_long, size: 16),
+                          SizedBox(width: 8),
+                          Text('Ordered Items'),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ],
-          ),
         ),
-        body: TabBarView(
-          children: [
-            ...provider.categories.map((category) {
-              final items = provider.menuItems.where((m) {
-                final matchesCategory = m.categoryId == category.id;
-                final matchesSearch = m.name.toLowerCase().contains(_searchQuery);
-                return matchesCategory && matchesSearch;
-              }).toList();
-              
-              return ListView.builder(
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  final quantity = provider.cart[item.id] ?? 0;
+        body: (_isSearching && _searchQuery.isNotEmpty)
+            ? Builder(
+                builder: (context) {
+                  final items = provider.menuItems.where((m) {
+                    return m.name.toLowerCase().contains(_searchQuery);
+                  }).toList();
 
-                  return ListTile(
-                    title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (item.description != null && item.description!.isNotEmpty)
-                          Text(item.description!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                        Text('₹${item.price.toStringAsFixed(2)}'),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (quantity > 0) ...[
-                          IconButton(
-                            icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                            onPressed: () => context.read<RestaurantProvider>().removeFromCart(item.id),
-                          ),
-                          Text('$quantity', style: const TextStyle(fontSize: 16)),
-                        ],
-                        IconButton(
-                          icon: const Icon(Icons.add_circle_outline, color: Colors.green),
-                          onPressed: () => context.read<RestaurantProvider>().addToCart(item.id),
+                  if (items.isEmpty) {
+                    return const Center(child: Text('No matching items found.'));
+                  }
+
+                  return ListView.builder(
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      final quantity = provider.cart[item.id] ?? 0;
+
+                      return ListTile(
+                        title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (item.description != null && item.description!.isNotEmpty)
+                              Text(item.description!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                            Text('₹${item.price.toStringAsFixed(2)}'),
+                          ],
                         ),
-                      ],
-                    ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (quantity > 0) ...[
+                              IconButton(
+                                icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                                onPressed: () => context.read<RestaurantProvider>().removeFromCart(item.id),
+                              ),
+                              Text('$quantity', style: const TextStyle(fontSize: 16)),
+                            ],
+                            IconButton(
+                              icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                              onPressed: () => context.read<RestaurantProvider>().addToCart(item.id),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   );
                 },
-              );
-            }),
-            _buildOrderedItemsTab(),
-          ],
-        ),
+              )
+            : TabBarView(
+                children: [
+                  ...provider.categories.map((category) {
+                    final items = provider.menuItems.where((m) {
+                      final matchesCategory = m.categoryId == category.id;
+                      final matchesSearch = m.name.toLowerCase().contains(_searchQuery);
+                      return matchesCategory && matchesSearch;
+                    }).toList();
+                    
+                    return ListView.builder(
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        final quantity = provider.cart[item.id] ?? 0;
+
+                        return ListTile(
+                          title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (item.description != null && item.description!.isNotEmpty)
+                                Text(item.description!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text('₹${item.price.toStringAsFixed(2)}'),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (quantity > 0) ...[
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                                  onPressed: () => context.read<RestaurantProvider>().removeFromCart(item.id),
+                                ),
+                                Text('$quantity', style: const TextStyle(fontSize: 16)),
+                              ],
+                              IconButton(
+                                icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                                onPressed: () => context.read<RestaurantProvider>().addToCart(item.id),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  }),
+                  _buildOrderedItemsTab(),
+                ],
+              ),
         floatingActionButton: provider.cart.isNotEmpty
             ? FloatingActionButton.extended(
                 onPressed: () {

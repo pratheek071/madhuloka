@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/restaurant_provider.dart';
+import '../../models/menu_item_model.dart';
 
 class TakeawayView extends StatefulWidget {
   const TakeawayView({super.key});
@@ -12,6 +13,46 @@ class TakeawayView extends StatefulWidget {
 class _TakeawayViewState extends State<TakeawayView> {
   final TextEditingController _customerController = TextEditingController();
   String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _customerController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildItemsList(List<MenuItem> items, RestaurantProvider provider) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        final qty = provider.cart[item.id] ?? 0;
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('₹${item.price}'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (qty > 0) ...[
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                    onPressed: () => provider.removeFromCart(item.id),
+                  ),
+                  Text('$qty', style: const TextStyle(fontSize: 16)),
+                ],
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                  onPressed: () => provider.addToCart(item.id),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +67,7 @@ class _TakeawayViewState extends State<TakeawayView> {
       length: provider.categories.length,
       child: Row(
         children: [
-          // Left Side: Tabbed Menu
+          // Left Side: Tabbed Menu or Global Search Results
           Expanded(
             flex: 2,
             child: Column(
@@ -34,7 +75,7 @@ class _TakeawayViewState extends State<TakeawayView> {
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: TextField(
-                    onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
+                    onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
                     decoration: const InputDecoration(
                       hintText: 'Search Menu...',
                       prefixIcon: Icon(Icons.search),
@@ -42,59 +83,48 @@ class _TakeawayViewState extends State<TakeawayView> {
                     ),
                   ),
                 ),
-                TabBar(
-                  isScrollable: true,
-                  labelColor: Colors.deepOrange,
-                  unselectedLabelColor: Colors.grey,
-                  indicatorColor: Colors.deepOrange,
-                  tabs: provider.categories.map((c) => Tab(text: c.name)).toList(),
-                ),
-                Expanded(
-                  child: TabBarView(
-                    children: provider.categories.map((category) {
-                      final items = provider.menuItems.where((m) => 
-                        m.categoryId == category.id && 
-                        m.name.toLowerCase().contains(_searchQuery)
-                      ).toList();
-
-                      if (items.isEmpty) {
-                        return const Center(child: Text('No items in this category.'));
-                      }
-
-                      return ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: items.length,
-                        itemBuilder: (context, index) {
-                          final item = items[index];
-                          final qty = provider.cart[item.id] ?? 0;
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text('₹${item.price}'),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (qty > 0) ...[
-                                    IconButton(
-                                      icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                                      onPressed: () => provider.removeFromCart(item.id),
-                                    ),
-                                    Text('$qty', style: const TextStyle(fontSize: 16)),
-                                  ],
-                                  IconButton(
-                                    icon: const Icon(Icons.add_circle_outline, color: Colors.green),
-                                    onPressed: () => provider.addToCart(item.id),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    }).toList(),
+                
+                if (_searchQuery.isEmpty) ...[
+                  TabBar(
+                    isScrollable: true,
+                    labelColor: Colors.deepOrange,
+                    unselectedLabelColor: Colors.grey,
+                    indicatorColor: Colors.deepOrange,
+                    tabs: provider.categories.map((c) => Tab(text: c.name)).toList(),
                   ),
-                ),
+                  Expanded(
+                    child: TabBarView(
+                      children: provider.categories.map((category) {
+                        final items = provider.menuItems.where((m) => 
+                          m.categoryId == category.id
+                        ).toList();
+
+                        if (items.isEmpty) {
+                          return const Center(child: Text('No items in this category.'));
+                        }
+
+                        return _buildItemsList(items, provider);
+                      }).toList(),
+                    ),
+                  ),
+                ] else ...[
+                  // Show single search results list irrespective of category
+                  Expanded(
+                    child: Builder(
+                      builder: (context) {
+                        final items = provider.menuItems.where((m) => 
+                          m.name.toLowerCase().contains(_searchQuery)
+                        ).toList();
+
+                        if (items.isEmpty) {
+                          return const Center(child: Text('No matching items found.'));
+                        }
+
+                        return _buildItemsList(items, provider);
+                      }
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

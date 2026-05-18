@@ -56,6 +56,44 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
     );
   }
 
+  void _showDeleteTableConfirmation(BuildContext context, RestaurantTable table) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Table?'),
+        content: Text('Are you sure you want to delete "${table.name}"? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await SupabaseService().deleteTable(table.id);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Table "${table.name}" deleted successfully')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to delete table: $e')),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -75,6 +113,14 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
           }
 
           final tables = snapshot.data ?? [];
+          tables.sort((a, b) {
+            final double? numA = double.tryParse(a.name);
+            final double? numB = double.tryParse(b.name);
+            if (numA != null && numB != null) {
+              return numA.compareTo(numB);
+            }
+            return a.name.compareTo(b.name);
+          });
 
           if (tables.isEmpty) {
             return const Center(child: Text('No tables found. Check Supabase connection.'));
@@ -93,45 +139,61 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
               final table = tables[index];
               final isOccupied = table.status == 'occupied';
 
-              return InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => MenuScreen(table: table),
+              return Stack(
+                children: [
+                  InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => MenuScreen(table: table),
+                        ),
+                      );
+                    },
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: double.infinity,
+                      child: Card(
+                        color: isOccupied ? Colors.orange.shade100 : Colors.green.shade100,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.restaurant,
+                              size: 40,
+                              color: isOccupied ? Colors.orange.shade800 : Colors.green.shade800,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              table.name,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: isOccupied ? Colors.orange.shade900 : Colors.green.shade900,
+                              ),
+                            ),
+                            Text(
+                              isOccupied ? 'Occupied' : 'Available',
+                              style: TextStyle(
+                                color: isOccupied ? Colors.orange.shade700 : Colors.green.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  );
-                },
-                child: Card(
-                  color: isOccupied ? Colors.orange.shade100 : Colors.green.shade100,
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.restaurant,
-                        size: 40,
-                        color: isOccupied ? Colors.orange.shade800 : Colors.green.shade800,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        table.name,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: isOccupied ? Colors.orange.shade900 : Colors.green.shade900,
-                        ),
-                      ),
-                      Text(
-                        isOccupied ? 'Occupied' : 'Available',
-                        style: TextStyle(
-                          color: isOccupied ? Colors.orange.shade700 : Colors.green.shade700,
-                        ),
-                      ),
-                    ],
                   ),
-                ),
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      onPressed: () => _showDeleteTableConfirmation(context, table),
+                    ),
+                  ),
+                ],
               );
             },
           );

@@ -1,13 +1,32 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:provider/provider';
 import '../../providers/restaurant_provider.dart';
+import '../../models/category_model.dart';
 
-class MenuManagementView extends StatelessWidget {
+class MenuManagementView extends StatefulWidget {
   const MenuManagementView({super.key});
+
+  @override
+  State<MenuManagementView> createState() => _MenuManagementViewState();
+}
+
+class _MenuManagementViewState extends State<MenuManagementView> {
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<RestaurantProvider>();
+
+    final filteredMenuItems = provider.menuItems.where((item) {
+      return item.name.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
 
     return Row(
       children: [
@@ -76,49 +95,95 @@ class MenuManagementView extends StatelessWidget {
                   ],
                 ),
               ),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: provider.menuItems.length,
-                  itemBuilder: (context, index) {
-                    final item = provider.menuItems[index];
-                    final category = provider.categories.firstWhere((c) => c.id == item.categoryId, orElse: () => throw Exception('Category not found'));
-
-                    return Card(
-                      child: ListTile(
-                        title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Category: ${category.name}'),
-                            if (item.description != null && item.description!.isNotEmpty)
-                              Text('Desc: ${item.description}', style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('₹${item.price}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                            const SizedBox(width: 16),
-                            IconButton(
-                              icon: const Icon(Icons.edit_outlined),
-                              onPressed: () => _showMenuItemDialog(context, item: item),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
-                              onPressed: () => _showDeleteConfirmation(
-                                context, 
-                                title: 'Delete Item?',
-                                message: 'Are you sure you want to delete "${item.name}"?',
-                                onConfirm: () => provider.deleteMenuItem(item.id),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+              
+              // Search Input Field
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search menu items...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              setState(() {
+                                _searchController.clear();
+                                _searchQuery = '';
+                              });
+                            },
+                          )
+                        : null,
+                    border: const OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                    ),
+                  ),
+                  onChanged: (val) {
+                    setState(() {
+                      _searchQuery = val;
+                    });
                   },
                 ),
+              ),
+
+              Expanded(
+                child: filteredMenuItems.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off, size: 64, color: Colors.grey.shade300),
+                          const SizedBox(height: 16),
+                          const Text('No items match your search', style: TextStyle(color: Colors.grey, fontSize: 18)),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: filteredMenuItems.length,
+                      itemBuilder: (context, index) {
+                        final item = filteredMenuItems[index];
+                        final category = provider.categories.firstWhere(
+                          (c) => c.id == item.categoryId, 
+                          orElse: () => Category(id: '', name: 'Unassigned')
+                        );
+
+                        return Card(
+                          child: ListTile(
+                            title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Category: ${category.name}'),
+                                if (item.description != null && item.description!.isNotEmpty)
+                                  Text('Desc: ${item.description}', style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+                              ],
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text('₹${item.price}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                const SizedBox(width: 16),
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined),
+                                  onPressed: () => _showMenuItemDialog(context, item: item),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                  onPressed: () => _showDeleteConfirmation(
+                                    context, 
+                                    title: 'Delete Item?',
+                                    message: 'Are you sure you want to delete "${item.name}"?',
+                                    onConfirm: () => provider.deleteMenuItem(item.id),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
               ),
             ],
           ),
@@ -127,7 +192,7 @@ class MenuManagementView extends StatelessWidget {
     );
   }
 
-  void _showCategoryDialog(BuildContext context, {dynamic category}) {
+  void _showCategoryDialog(BuildContext context, {Category? category}) {
     final nameController = TextEditingController(text: category?.name ?? '');
 
     showDialog(
@@ -161,7 +226,7 @@ class MenuManagementView extends StatelessWidget {
     final nameController = TextEditingController(text: item?.name ?? '');
     final priceController = TextEditingController(text: item?.price.toString() ?? '');
     final descriptionController = TextEditingController(text: item?.description ?? '');
-    String? selectedCategoryId = item?.categoryId ?? provider.categories.first.id;
+    String? selectedCategoryId = item?.categoryId ?? (provider.categories.isNotEmpty ? provider.categories.first.id : null);
     String selectedItemType = item?.itemType ?? 'food';
 
     showDialog(
@@ -172,12 +237,15 @@ class MenuManagementView extends StatelessWidget {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              DropdownButtonFormField<String>(
-                value: selectedCategoryId,
-                items: provider.categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
-                onChanged: (val) => setState(() => selectedCategoryId = val),
-                decoration: const InputDecoration(labelText: 'Category'),
-              ),
+              if (provider.categories.isNotEmpty)
+                DropdownButtonFormField<String>(
+                  value: selectedCategoryId,
+                  items: provider.categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
+                  onChanged: (val) => setState(() => selectedCategoryId = val),
+                  decoration: const InputDecoration(labelText: 'Category'),
+                )
+              else
+                const Text('Please add a category first!', style: TextStyle(color: Colors.red)),
               TextField(
                 controller: nameController,
                 decoration: const InputDecoration(labelText: 'Item Name'),
@@ -208,6 +276,7 @@ class MenuManagementView extends StatelessWidget {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () {
+                if (selectedCategoryId == null) return;
                 if (item == null) {
                   provider.addMenuItem(selectedCategoryId!, nameController.text, double.parse(priceController.text), descriptionController.text, selectedItemType);
                 } else {
