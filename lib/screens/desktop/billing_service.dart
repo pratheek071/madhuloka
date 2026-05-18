@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/order_model.dart';
 import '../../models/order_item_model.dart';
 import 'package:intl/intl.dart';
@@ -34,10 +35,27 @@ class BillingService {
       }
     } catch (_) {}
 
+    // Calculate sequential bill number
+    int billNumber = 1;
+    try {
+      final response = await Supabase.instance.client
+          .from('orders')
+          .select('id')
+          .eq('status', 'paid')
+          .lte('created_at', order.createdAt.toUtc().toIso8601String());
+      billNumber = (response as List).length;
+      if (order.status != 'paid') {
+        billNumber += 1;
+      }
+    } catch (_) {
+      billNumber = (order.createdAt.millisecondsSinceEpoch ~/ 1000) % 10000;
+    }
+    final String billNoString = 'REG-${billNumber.toString().padLeft(4, '0')}';
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.roll80, // 80mm thermal printer width
-        margin: const pw.EdgeInsets.all(10),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         build: (pw.Context context) {
           final bool isKOT = title != null;
 
@@ -59,7 +77,7 @@ class BillingService {
                   pw.Text('Customer: ${order.customerInfo}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
                 
                 pw.SizedBox(height: 5),
-                pw.Text('------------------------------------------', style: const pw.TextStyle(fontSize: 10)),
+                pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
                 
                 // 2-Column Heading for Kitchen/Bar
                 pw.Row(
@@ -68,7 +86,7 @@ class BillingService {
                     pw.Expanded(child: pw.Text('Qty', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))),
                   ],
                 ),
-                pw.Text('------------------------------------------', style: const pw.TextStyle(fontSize: 10)),
+                pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
                 
                 // Bold/Clear Item list for Kitchen/Bar
                 ...items.map((item) => pw.Padding(
@@ -81,7 +99,7 @@ class BillingService {
                   ),
                 )),
                 
-                pw.Text('------------------------------------------', style: const pw.TextStyle(fontSize: 10)),
+                pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
               ] else ...[
                 // Logo
                 if (logoBytes != null) ...[
@@ -113,15 +131,14 @@ class BillingService {
                 pw.SizedBox(height: 10),
                 
                 // Customer Bill Info
-                pw.Text('Bill No: REG-${order.id.substring(0, 5).toUpperCase()}', style: const pw.TextStyle(fontSize: 9)),
+                pw.Text('Bill No: $billNoString', style: const pw.TextStyle(fontSize: 9)),
                 pw.Text('Date: ${DateFormat('dd-MM-yyyy').format(order.createdAt)}', style: const pw.TextStyle(fontSize: 9)),
                 pw.Text('Time: ${DateFormat('hh:mm a').format(order.createdAt)}', style: const pw.TextStyle(fontSize: 9)),
-                pw.Text('Table: ${order.tableName ?? 'Table'}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
                 if (order.customerInfo != null && order.customerInfo!.isNotEmpty)
                   pw.Text('Customer: ${order.customerInfo}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
                 
                 pw.SizedBox(height: 5),
-                pw.Text('------------------------------------------', style: const pw.TextStyle(fontSize: 10)),
+                pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
                 
                 // 4-Column Heading with Prices
                 pw.Row(
@@ -132,7 +149,7 @@ class BillingService {
                     pw.Expanded(child: pw.Text('Total', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
                   ],
                 ),
-                pw.Text('------------------------------------------', style: const pw.TextStyle(fontSize: 10)),
+                pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
                 
                 // Detailed Item list with Prices
                 ...items.map((item) => pw.Padding(
@@ -147,7 +164,7 @@ class BillingService {
                   ),
                 )),
                 
-                pw.Text('------------------------------------------', style: const pw.TextStyle(fontSize: 10)),
+                pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
                 
                 // Subtotal, Taxes, Grand Total
                 pw.Row(
@@ -171,7 +188,7 @@ class BillingService {
                     pw.Text(sgst.toStringAsFixed(2), style: const pw.TextStyle(fontSize: 9)),
                   ],
                 ),
-                pw.Text('------------------------------------------', style: const pw.TextStyle(fontSize: 10)),
+                pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
                 
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -181,7 +198,7 @@ class BillingService {
                   ],
                 ),
                 
-                pw.Text('------------------------------------------', style: const pw.TextStyle(fontSize: 10)),
+                pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
                 pw.SizedBox(height: 10),
                 
                 // Business Thank You Footer
@@ -194,10 +211,6 @@ class BillingService {
                 pw.Center(
                   child: pw.Text('Please Visit Again', style: const pw.TextStyle(fontSize: 9)),
                 ),
-                pw.SizedBox(height: 5),
-                pw.Center(
-                  child: pw.Text('GSTIN: 29AAAAA0000A1Z5', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
-                ),
               ],
             ],
           );
@@ -208,7 +221,7 @@ class BillingService {
     // This opens the system print dialog which supports both Windows and Mac
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: 'Bill_${order.tableName ?? 'Table'}_${order.id.substring(0, 5)}',
+      name: 'Bill_${order.tableName ?? 'Table'}_$billNoString',
     );
   }
 }
