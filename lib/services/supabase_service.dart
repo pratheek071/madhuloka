@@ -100,6 +100,7 @@ class SupabaseService {
         .select('*, tables(name), order_items(*, menu_items(name, item_type))')
         .eq('id', orderId)
         .single();
+    print("GET_ORDER_DETAILS_RESPONSE: $response");
     return OrderModel.fromJson(response);
   }
 

@@ -167,6 +167,10 @@ class _DesktopDashboardState extends State<DesktopDashboard> {
                           key: ValueKey('$_selectedOrderId-${orders.map((o) => o.totalAmount).join("-")}'),
                           future: _service.getOrderDetails(_selectedOrderId!),
                           builder: (context, detailsSnapshot) {
+                            if (detailsSnapshot.hasError) {
+                              print("ERROR FETCHING ORDER DETAILS: ${detailsSnapshot.error}");
+                              return _buildEmptyState('Error loading details: ${detailsSnapshot.error}');
+                            }
                             if (detailsSnapshot.connectionState == ConnectionState.waiting && !detailsSnapshot.hasData) {
                               return const Center(child: CircularProgressIndicator());
                             }
@@ -174,6 +178,10 @@ class _DesktopDashboardState extends State<DesktopDashboard> {
                               return _buildEmptyState('Select an order to view details');
                             }
                             final detailedOrder = detailsSnapshot.data!;
+                            print("DETAILED ORDER ID: ${detailedOrder.id}, ITEMS COUNT: ${detailedOrder.items.length}");
+                            for (var item in detailedOrder.items) {
+                              print("  - ITEM: ${item.itemName}, QTY: ${item.quantity}, PRICE: ${item.price}");
+                            }
                             return _OrderDetailsView(
                               order: detailedOrder,
                               onStatusUpdate: () {
@@ -532,7 +540,7 @@ class _OrderDetailsView extends StatelessWidget {
       displayTableName = table.name == 'Table Order' ? 'Table ${order.tableId?.substring(0,4) ?? "Unk"}' : table.name;
     }
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(48.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -651,29 +659,30 @@ class _OrderDetailsView extends StatelessWidget {
           ),
           
           // Items List
-          Expanded(
-            child: ListView.builder(
-              itemCount: order.items.length,
-              itemBuilder: (context, index) {
-                final item = order.items[index];
-                return Container(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  decoration: BoxDecoration(
-                    border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(flex: 3, child: Text(item.itemName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500))),
-                      Expanded(child: Text('x ${item.quantity}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 18))),
-                      Expanded(child: Text('₹${item.price}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 18))),
-                      Expanded(child: Text('₹${(item.price * item.quantity).toStringAsFixed(2)}', 
-                        textAlign: TextAlign.right, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-                    ],
-                  ),
-                );
-              },
-            ),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: order.items.length,
+            itemBuilder: (context, index) {
+              final item = order.items[index];
+              return Container(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(flex: 3, child: Text(item.itemName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500))),
+                    Expanded(child: Text('x ${item.quantity}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 18))),
+                    Expanded(child: Text('₹${item.price}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 18))),
+                    Expanded(child: Text('₹${(item.price * item.quantity).toStringAsFixed(2)}', 
+                      textAlign: TextAlign.right, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                  ],
+                ),
+              );
+            },
           ),
+          const SizedBox(height: 32),
           
           // Totals Section
           Container(
