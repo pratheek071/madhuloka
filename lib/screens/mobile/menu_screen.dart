@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/restaurant_provider.dart';
 import '../../models/table_model.dart';
 import '../../models/order_model.dart';
+import '../../models/order_item_model.dart';
 import '../../services/supabase_service.dart';
 import 'cart_screen.dart';
 
@@ -137,6 +138,52 @@ class _MenuScreenState extends State<MenuScreen> {
     );
   }
 
+  Future<void> _updateOrderedItemQuantity(OrderModel order, OrderItem targetItem, int newQuantity) async {
+    final List<Map<String, dynamic>> itemsToSave = [];
+    double newTotal = 0.0;
+
+    for (var item in order.items) {
+      int quantity = item.id == targetItem.id ? newQuantity : item.quantity;
+      if (quantity <= 0) continue; // Deleted/omitted
+
+      itemsToSave.add({
+        'order_id': order.id,
+        'menu_item_id': item.menuItemId,
+        'quantity': quantity,
+        'price': item.price,
+      });
+
+      double itemPrice = item.price * quantity;
+      final type = item.itemType.toLowerCase();
+      if (type == 'food' || type == 'cocktail' || type == 'mocktail') {
+        itemPrice *= 1.05;
+      }
+      newTotal += itemPrice;
+    }
+
+    try {
+      if (itemsToSave.isEmpty) {
+        // If all items are deleted, cancel the order and free table
+        await SupabaseService().updateOrderStatus(order.id, 'cancelled', tableId: order.tableId);
+      } else {
+        await SupabaseService().updateOrderItems(order.id, itemsToSave, newTotal);
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Order updated successfully!')),
+        );
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update order: $e')),
+        );
+      }
+    }
+  }
+
   Widget _buildOrderedItemsTab() {
     return StreamBuilder<OrderModel?>(
       stream: SupabaseService().watchActiveOrderForTable(widget.table.id),
@@ -188,15 +235,33 @@ class _MenuScreenState extends State<MenuScreen> {
                     itemCount: fullOrder.items.length,
                     itemBuilder: (context, index) {
                       final item = fullOrder.items[index];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.orange.shade100,
-                          child: Text('${item.quantity}', style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        elevation: 1,
+                        child: ListTile(
+                          title: Text(item.itemName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text('₹${item.price.toStringAsFixed(2)} each\nTotal: ₹${(item.price * item.quantity).toStringAsFixed(2)}'),
+                          isThreeLine: true,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.remove_circle_outline, color: Colors.orange),
+                                onPressed: () => _updateOrderedItemQuantity(fullOrder, item, item.quantity - 1),
+                              ),
+                              Text('${item.quantity}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                              IconButton(
+                                icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                                onPressed: () => _updateOrderedItemQuantity(fullOrder, item, item.quantity + 1),
+                              ),
+                              const SizedBox(width: 4),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                onPressed: () => _updateOrderedItemQuantity(fullOrder, item, 0),
+                              ),
+                            ],
+                          ),
                         ),
-                        title: Text(item.itemName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('₹${item.price} each'),
-                        trailing: Text('₹${(item.price * item.quantity).toStringAsFixed(2)}', 
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
                       );
                     },
                   ),
