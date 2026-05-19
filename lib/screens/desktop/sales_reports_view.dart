@@ -259,6 +259,7 @@ class _SalesReportsViewState extends State<SalesReportsView> {
                 headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
                 columnSpacing: 24,
                 columns: const [
+                  DataColumn(label: Text('BILL NO', style: TextStyle(fontWeight: FontWeight.bold))),
                   DataColumn(label: Text('TIME', style: TextStyle(fontWeight: FontWeight.bold))),
                   DataColumn(label: Text('TABLE / INFO', style: TextStyle(fontWeight: FontWeight.bold))),
                   DataColumn(label: Text('SOURCE', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -275,6 +276,10 @@ class _SalesReportsViewState extends State<SalesReportsView> {
                   return DataRow(
                     color: WidgetStateProperty.all(isEven ? Colors.white : Colors.grey.shade50),
                     cells: [
+                      DataCell(Text(order.billNo != null 
+                        ? 'REG-${order.billNo.toString().padLeft(4, '0')}' 
+                        : 'N/A', 
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey))),
                       DataCell(Text(DateFormat('HH:mm, dd MMM').format(order.completedAt ?? order.createdAt))),
                       DataCell(Text(order.isParcel 
                         ? 'Parcel: ${order.customerInfo ?? "N/A"}' 

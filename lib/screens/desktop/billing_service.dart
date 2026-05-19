@@ -35,19 +35,40 @@ class BillingService {
       }
     } catch (_) {}
 
-    // Calculate sequential bill number
-    int billNumber = 1;
-    try {
-      final response = await Supabase.instance.client
-          .from('orders')
-          .select('id')
-          .eq('status', 'paid')
-          .lte('created_at', order.createdAt.toUtc().toIso8601String());
-      billNumber = (response as List).length;
-      if (order.status != 'paid') {
-        billNumber += 1;
+    // Get the next bill number if not already assigned
+    int? billNumber = order.billNo;
+    if (billNumber == null && title == null) {
+      try {
+        final response = await Supabase.instance.client
+            .from('orders')
+            .select('bill_no')
+            .order('bill_no', descending: true)
+            .limit(1)
+            .maybeSingle();
+        
+        int lastBillNo = 0;
+        if (response != null && response['bill_no'] != null) {
+          lastBillNo = response['bill_no'] as int;
+        } else {
+          final countResponse = await Supabase.instance.client
+              .from('orders')
+              .select('id')
+              .eq('status', 'paid');
+          lastBillNo = (countResponse as List).length;
+        }
+
+        billNumber = lastBillNo + 1;
+
+        // Save the newly generated incremental bill number back to the database
+        await Supabase.instance.client
+            .from('orders')
+            .update({'bill_no': billNumber})
+            .eq('id', order.id);
+      } catch (_) {
+        billNumber = (order.createdAt.millisecondsSinceEpoch ~/ 1000) % 10000;
       }
-    } catch (_) {
+    } else if (billNumber == null) {
+      // For KOT/BOT (which has title != null), if no bill number is set yet, show placeholder or count-based
       billNumber = (order.createdAt.millisecondsSinceEpoch ~/ 1000) % 10000;
     }
     final String billNoString = 'REG-${billNumber.toString().padLeft(4, '0')}';

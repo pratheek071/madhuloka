@@ -13,6 +13,7 @@ class OrderModel {
   final String? customerInfo;
   final String orderSource; // 'waiter' or 'customer'
   final String? paymentMethod;
+  final int? billNo;
 
   OrderModel({
     required this.id,
@@ -27,6 +28,7 @@ class OrderModel {
     this.customerInfo,
     this.orderSource = 'waiter',
     this.paymentMethod,
+    this.billNo,
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
@@ -42,6 +44,7 @@ class OrderModel {
       customerInfo: json['customer_info'],
       orderSource: json['order_source'] ?? 'waiter',
       paymentMethod: json['payment_method'],
+      billNo: json['bill_no'],
       items: (json['order_items'] as List?)
               ?.map((item) => OrderItem.fromJson(item))
               .toList() ??
@@ -59,6 +62,7 @@ class OrderModel {
       'order_source': orderSource,
       'payment_method': paymentMethod,
       'completed_at': completedAt?.toIso8601String(),
+      'bill_no': billNo,
     };
   }
 
