@@ -719,7 +719,13 @@ class _InfoBadge extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: color ?? Colors.grey.shade600),
           const SizedBox(width: 6),
-          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color ?? Colors.grey.shade600)),
+          Flexible(
+            child: Text(
+              label, 
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color ?? Colors.grey.shade600),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
