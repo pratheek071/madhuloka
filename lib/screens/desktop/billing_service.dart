@@ -26,6 +26,9 @@ class BillingService {
     final double cgst = gstAmount / 2;
     final double sgst = cgst;
     final double total = subtotal + gstAmount;
+    final double discountPercent = order.discount;
+    final double discountAmount = total * (discountPercent / 100);
+    final double finalTotal = total - discountAmount;
 
     // Load logo if exists
     Uint8List? logoBytes;
@@ -159,35 +162,36 @@ class BillingService {
                 pw.SizedBox(height: 5),
                 pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
                 
-                // 5-Column Heading with Prices
+                // 5-Column Receipt Grid
                 pw.Row(
                   children: [
-                    pw.Expanded(flex: 3, child: pw.Text('Item Name', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                    pw.Expanded(flex: 3, child: pw.Text('Item Description', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                     pw.Expanded(child: pw.Text('Qty', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-                    pw.Expanded(child: pw.Text('Menu', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-                    pw.Expanded(child: pw.Text('Net', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                    pw.Expanded(child: pw.Text('Rate', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                    pw.Expanded(child: pw.Text('Tax Rate', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                     pw.Expanded(child: pw.Text('Total', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                   ],
                 ),
-                pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
+                pw.Divider(thickness: 0.5, color: PdfColors.grey400, height: 8),
                 
-                // Detailed Item list with Prices
+                // Item Rows
                 ...items.map((item) {
                   final type = item.itemType.toLowerCase();
-                  final bool isTaxable = type == 'food' || type == 'cocktail' || type == 'mocktail';
-                  final double originalPrice = item.price;
-                  final double taxAddedPrice = isTaxable ? (originalPrice * 1.05) : originalPrice;
-                  final double itemTotal = taxAddedPrice * item.quantity;
-
+                  final isTaxed = type == 'food' || type == 'cocktail' || type == 'mocktail';
+                  
+                  final double rate = item.price;
+                  final double taxRate = isTaxed ? (item.price * 1.05) : item.price;
+                  final double totalLinePrice = item.price * item.quantity;
+                  
                   return pw.Padding(
                     padding: const pw.EdgeInsets.symmetric(vertical: 2),
                     child: pw.Row(
                       children: [
-                        pw.Expanded(flex: 3, child: pw.Text(item.itemName, style: const pw.TextStyle(fontSize: 8))),
-                        pw.Expanded(child: pw.Text(item.quantity.toString(), textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
-                        pw.Expanded(child: pw.Text(originalPrice.toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8))),
-                        pw.Expanded(child: pw.Text(taxAddedPrice.toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8))),
-                        pw.Expanded(child: pw.Text(itemTotal.toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Expanded(flex: 3, child: pw.Text(item.itemName, style: const pw.TextStyle(fontSize: 7.5))),
+                        pw.Expanded(child: pw.Text('${item.quantity}', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5))),
+                        pw.Expanded(child: pw.Text(rate.toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 7.5))),
+                        pw.Expanded(child: pw.Text(taxRate.toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 7.5))),
+                        pw.Expanded(child: pw.Text(totalLinePrice.toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 7.5))),
                       ],
                     ),
                   );
@@ -218,12 +222,30 @@ class BillingService {
                   ],
                 ),
                 pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
+
+                if (discountPercent > 0) ...[
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Total after Tax:', style: const pw.TextStyle(fontSize: 9)),
+                      pw.Text(total.toStringAsFixed(2), style: const pw.TextStyle(fontSize: 9)),
+                    ],
+                  ),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Discount (${discountPercent.toStringAsFixed(0)}%):', style: const pw.TextStyle(fontSize: 9)),
+                      pw.Text('-${discountAmount.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 9)),
+                    ],
+                  ),
+                  pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
+                ],
                 
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
                     pw.Text('GRAND TOTAL:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                    pw.Text('Rs ${total.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                    pw.Text('Rs ${finalTotal.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
                   ],
                 ),
                 

@@ -267,4 +267,10 @@ class SupabaseService {
       'total_amount': totalAmount,
     }).eq('id', orderId);
   }
+
+  Future<void> updateOrderDiscount(String orderId, double discount) async {
+    await client.from('orders').update({
+      'discount': discount,
+    }).eq('id', orderId);
+  }
 }

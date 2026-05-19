@@ -163,8 +163,7 @@ class _DesktopDashboardState extends State<DesktopDashboard> {
                   child: _selectedOrderId == null
                       ? _buildEmptyState('Select an order to view details')
                       : FutureBuilder<OrderModel>(
-                          // Key based on order ID and the orders list state hash/total changes to trigger a reload when waiter app updates the order items
-                          key: ValueKey('$_selectedOrderId-${orders.map((o) => o.totalAmount).join("-")}'),
+                          key: ValueKey('$_selectedOrderId-${orders.map((o) => "${o.totalAmount}-${o.discount}").join("-")}'),
                           future: _service.getOrderDetails(_selectedOrderId!),
                           builder: (context, detailsSnapshot) {
                             if (detailsSnapshot.hasError) {
@@ -316,6 +315,69 @@ class _OrderDetailsView extends StatelessWidget {
         );
       }
     }
+  }
+
+  void _showDiscountDialog(BuildContext context, OrderModel order) {
+    final controller = TextEditingController(
+      text: order.discount > 0 ? order.discount.toStringAsFixed(0) : '',
+    );
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Discount (%)'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Enter discount percentage (e.g. 10 for 10% discount):'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Discount Percentage',
+                suffixText: '%',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await SupabaseService().updateOrderDiscount(order.id, 0.0);
+              if (context.mounted) {
+                context.read<RestaurantProvider>().fetchData();
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Remove Discount', style: TextStyle(color: Colors.red)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final double discount = double.tryParse(controller.text) ?? 0.0;
+              if (discount < 0 || discount > 100) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a value between 0 and 100')),
+                );
+                return;
+              }
+              await SupabaseService().updateOrderDiscount(order.id, discount);
+              if (context.mounted) {
+                context.read<RestaurantProvider>().fetchData();
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showEditOrderDialog(BuildContext context, OrderModel order) {
@@ -579,6 +641,12 @@ class _OrderDetailsView extends StatelessWidget {
                     color: Colors.orange,
                   ),
                   _ActionButton(
+                    onPressed: () => _showDiscountDialog(context, order),
+                    icon: Icons.percent,
+                    label: 'Add Discount',
+                    color: Colors.purple,
+                  ),
+                  _ActionButton(
                     onPressed: () => _safePrint(context, () => BillingService.printKotAndBot(order, context: context)),
                     icon: Icons.receipt_long,
                     label: 'Print KOT & BOT',
@@ -669,6 +737,10 @@ class _OrderDetailsView extends StatelessWidget {
                 
                 final gstAmount = taxableTotal * 0.05;
                 final subtotal = taxableTotal + nonTaxableTotal;
+                final total = subtotal + gstAmount;
+                final discountPercent = order.discount;
+                final discountAmount = total * (discountPercent / 100);
+                final finalTotal = total - discountAmount;
 
                 return Column(
                   children: [
@@ -677,13 +749,25 @@ class _OrderDetailsView extends StatelessWidget {
                     _TotalRow(label: 'CGST (2.5%)', value: gstAmount / 2),
                     const SizedBox(height: 8),
                     _TotalRow(label: 'SGST (2.5%)', value: gstAmount / 2),
+                    if (discountPercent > 0) ...[
+                      const SizedBox(height: 8),
+                      _TotalRow(label: 'Total after Tax', value: total),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Discount (${discountPercent.toStringAsFixed(0)}%)', style: const TextStyle(fontSize: 16, color: Colors.purple, fontWeight: FontWeight.w500)),
+                          Text('-₹${discountAmount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.purple)),
+                        ],
+                      ),
+                    ],
                     const Divider(height: 32),
                     Wrap(
                       alignment: WrapAlignment.spaceBetween,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         const Text('Grand Total', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                        Text('₹${(subtotal + gstAmount).toStringAsFixed(2)}', 
+                        Text('₹${finalTotal.toStringAsFixed(2)}', 
                           style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.black)),
                       ],
                     ),
