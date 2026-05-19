@@ -418,4 +418,75 @@ class BillingService {
       },
     );
   }
+
+  static Future<void> printBestSellingItemsReport(
+      DateTime start, DateTime end, List<MapEntry<String, int>> sortedItems,
+      {required BuildContext context}) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.roll80,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        build: (pw.Context ctx) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Center(
+                child: pw.Text('MADHULOKA DINING', 
+                  style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.Center(
+                child: pw.Text('BEST SELLING ITEMS REPORT', 
+                  style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 5),
+              pw.Center(
+                child: pw.Text(
+                  'Period: ${DateFormat('dd-MM-yyyy').format(start)} to ${DateFormat('dd-MM-yyyy').format(end)}',
+                  style: const pw.TextStyle(fontSize: 8),
+                ),
+              ),
+              pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
+              
+              // Column Headers
+              pw.Row(
+                children: [
+                  pw.Expanded(flex: 1, child: pw.Text('Rank', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                  pw.Expanded(flex: 4, child: pw.Text('Item Description', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                  pw.Expanded(flex: 2, child: pw.Text('Qty Sold', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                ],
+              ),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey400, height: 8),
+              
+              // Item Rows
+              ...sortedItems.asMap().entries.map((entry) {
+                final int idx = entry.key;
+                final MapEntry<String, int> item = entry.value;
+                return pw.Padding(
+                  padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                  child: pw.Row(
+                    children: [
+                      pw.Expanded(flex: 1, child: pw.Text('${idx + 1}', style: const pw.TextStyle(fontSize: 7.5))),
+                      pw.Expanded(flex: 4, child: pw.Text(item.key, style: const pw.TextStyle(fontSize: 7.5))),
+                      pw.Expanded(flex: 2, child: pw.Text('${item.value}', textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 7.5))),
+                    ],
+                  ),
+                );
+              }),
+              
+              pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
+              pw.SizedBox(height: 5),
+              pw.Center(
+                child: pw.Text('End of Report', style: pw.TextStyle(fontSize: 8, fontStyle: pw.FontStyle.italic)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    final String filename = 'Best_Selling_${DateFormat('yyyyMMdd').format(start)}_${DateFormat('yyyyMMdd').format(end)}';
+    _showPrintPreviewDialog(context, pdf, filename);
+  }
 }

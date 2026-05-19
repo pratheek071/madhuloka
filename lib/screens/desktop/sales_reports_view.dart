@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/restaurant_provider.dart';
 import '../../models/order_model.dart';
+import 'billing_service.dart';
 
 class SalesReportsView extends StatefulWidget {
   const SalesReportsView({super.key});
@@ -350,7 +351,30 @@ class _SalesReportsViewState extends State<SalesReportsView> {
             children: [
               Padding(
                 padding: const EdgeInsets.all(20),
-                child: Text('Best Selling Items', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade800)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Best Selling Items', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade800)),
+                    ElevatedButton.icon(
+                      onPressed: sortedItems.isEmpty 
+                          ? null 
+                          : () => BillingService.printBestSellingItemsReport(
+                                _selectedRange.start,
+                                _selectedRange.end,
+                                sortedItems,
+                                context: context,
+                              ),
+                      icon: const Icon(Icons.print, size: 16),
+                      label: const Text('Print Report'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepOrange,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const Divider(height: 1),
               Expanded(
