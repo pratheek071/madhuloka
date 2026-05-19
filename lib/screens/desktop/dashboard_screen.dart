@@ -546,36 +546,28 @@ class _OrderDetailsView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Detailed Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(displayTableName, 
-                      style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 8,
-                      children: [
-                        _InfoBadge(label: 'Order ID: ${order.id.substring(0,8)}', icon: Icons.tag),
-                        _InfoBadge(label: 'Placed: ${DateFormat('hh:mm a').format(order.createdAt)}', icon: Icons.schedule),
-                        _InfoBadge(
-                          label: order.orderSource.toUpperCase(), 
-                          icon: order.isCustomerOrder ? Icons.phone_android : Icons.person,
-                          color: order.isCustomerOrder ? Colors.blue : Colors.grey,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+              Text(displayTableName, 
+                style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(width: 16),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  _InfoBadge(label: 'Order ID: ${order.id.substring(0,8)}', icon: Icons.tag),
+                  _InfoBadge(label: 'Placed: ${DateFormat('hh:mm a').format(order.createdAt)}', icon: Icons.schedule),
+                  _InfoBadge(
+                    label: order.orderSource.toUpperCase(), 
+                    icon: order.isCustomerOrder ? Icons.phone_android : Icons.person,
+                    color: order.isCustomerOrder ? Colors.blue : Colors.grey,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
               Wrap(
                 spacing: 16,
                 runSpacing: 16,
