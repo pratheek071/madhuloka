@@ -23,8 +23,6 @@ class BillingService {
         
     final double gstAmount = taxableTotal * 0.05;
     final double subtotal = taxableTotal + nonTaxableTotal;
-    final double cgst = gstAmount / 2;
-    final double sgst = cgst;
     final double total = subtotal + gstAmount;
     final double discountPercent = order.discount;
     final double discountAmount = total * (discountPercent / 100);
@@ -167,8 +165,8 @@ class BillingService {
                   children: [
                     pw.Expanded(flex: 3, child: pw.Text('Item Description', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                     pw.Expanded(child: pw.Text('Qty', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-                    pw.Expanded(child: pw.Text('Rate', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-                    pw.Expanded(child: pw.Text('Tax Rate', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                    pw.Expanded(child: pw.Text('Price', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                    pw.Expanded(child: pw.Text('Price (Incl. Tax)', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                     pw.Expanded(child: pw.Text('Total', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                   ],
                 ),
@@ -181,7 +179,7 @@ class BillingService {
                   
                   final double rate = item.price;
                   final double taxRate = isTaxed ? (item.price * 1.05) : item.price;
-                  final double totalLinePrice = item.price * item.quantity;
+                  final double totalLinePrice = taxRate * item.quantity;
                   
                   return pw.Padding(
                     padding: const pw.EdgeInsets.symmetric(vertical: 2),
@@ -199,35 +197,12 @@ class BillingService {
                 
                 pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
                 
-                // Subtotal, Taxes, Grand Total
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text('Sub Total:', style: const pw.TextStyle(fontSize: 9)),
-                    pw.Text(subtotal.toStringAsFixed(2), style: const pw.TextStyle(fontSize: 9)),
-                  ],
-                ),
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text('CGST (2.5%):', style: const pw.TextStyle(fontSize: 9)),
-                    pw.Text(cgst.toStringAsFixed(2), style: const pw.TextStyle(fontSize: 9)),
-                  ],
-                ),
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text('SGST (2.5%):', style: const pw.TextStyle(fontSize: 9)),
-                    pw.Text(sgst.toStringAsFixed(2), style: const pw.TextStyle(fontSize: 9)),
-                  ],
-                ),
-                pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
-
+                // Subtotal, Taxes, Grand Total (CGST & SGST removed per request)
                 if (discountPercent > 0) ...[
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      pw.Text('Total after Tax:', style: const pw.TextStyle(fontSize: 9)),
+                      pw.Text('Total (Incl. Tax):', style: const pw.TextStyle(fontSize: 9)),
                       pw.Text(total.toStringAsFixed(2), style: const pw.TextStyle(fontSize: 9)),
                     ],
                   ),
