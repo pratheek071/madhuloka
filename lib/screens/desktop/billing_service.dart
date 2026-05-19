@@ -147,9 +147,6 @@ class BillingService {
                 pw.Center(
                   child: pw.Text('RC conforts Belur Road Chikmagalur 577101', style: const pw.TextStyle(fontSize: 8)),
                 ),
-                pw.Center(
-                  child: pw.Text('Ph: 9876543210', style: const pw.TextStyle(fontSize: 8)),
-                ),
                 pw.SizedBox(height: 10),
                 
                 // Customer Bill Info
@@ -274,7 +271,10 @@ class BillingService {
         pw.Text('Order ID: ${order.id.substring(0, 8).toUpperCase()}', style: const pw.TextStyle(fontSize: 9)),
         pw.Text('Date: ${DateFormat('dd-MM-yyyy').format(order.createdAt)}', style: const pw.TextStyle(fontSize: 9)),
         pw.Text('Time: ${DateFormat('hh:mm a').format(order.createdAt)}', style: const pw.TextStyle(fontSize: 9)),
-        pw.Text('Table: ${order.tableName ?? 'Table'}', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+        pw.Text(
+          order.isParcel ? 'Type: PARCEL' : 'Table: ${order.tableName ?? 'Table'}',
+          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+        ),
         if (order.customerInfo != null && order.customerInfo!.isNotEmpty)
           pw.Text('Customer: ${order.customerInfo}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
         
