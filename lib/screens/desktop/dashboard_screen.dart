@@ -659,12 +659,6 @@ class _OrderDetailsView extends StatelessWidget {
                     color: Colors.teal,
                   ),
                   _ActionButton(
-                    onPressed: () => _showPaymentMethodDialog(context, order, shouldPrint: true),
-                    icon: Icons.print_outlined,
-                    label: 'Print & Settle',
-                    color: Colors.blue,
-                  ),
-                  _ActionButton(
                     onPressed: () => _showPaymentMethodDialog(context, order),
                     icon: Icons.check_circle_outline,
                     label: 'Mark Paid',
