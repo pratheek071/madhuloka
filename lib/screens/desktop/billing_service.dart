@@ -160,14 +160,13 @@ class BillingService {
                 pw.SizedBox(height: 5),
                 pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
                 
-                // 5-Column Receipt Grid
+                // 4-Column Receipt Grid
                 pw.Row(
                   children: [
                     pw.Expanded(flex: 3, child: pw.Text('Item Description', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                     pw.Expanded(child: pw.Text('Qty', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                     pw.Expanded(child: pw.Text('Price', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-                    pw.Expanded(child: pw.Text('Price (Incl. 5% Tax)', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-                    pw.Expanded(child: pw.Text('Total', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                    pw.Expanded(flex: 2, child: pw.Text('Total Price (incl. 5% tax)', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                   ],
                 ),
                 pw.Divider(thickness: 0.5, color: PdfColors.grey400, height: 8),
@@ -188,8 +187,7 @@ class BillingService {
                         pw.Expanded(flex: 3, child: pw.Text(item.itemName, style: const pw.TextStyle(fontSize: 7.5))),
                         pw.Expanded(child: pw.Text('${item.quantity}', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5))),
                         pw.Expanded(child: pw.Text(rate.toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 7.5))),
-                        pw.Expanded(child: pw.Text(taxRate.toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 7.5))),
-                        pw.Expanded(child: pw.Text(totalLinePrice.toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 7.5))),
+                        pw.Expanded(flex: 2, child: pw.Text(totalLinePrice.toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 7.5))),
                       ],
                     ),
                   );
