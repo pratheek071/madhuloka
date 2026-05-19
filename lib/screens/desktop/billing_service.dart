@@ -42,7 +42,7 @@ class BillingService {
         final response = await Supabase.instance.client
             .from('orders')
             .select('bill_no')
-            .order('bill_no', descending: true)
+            .order('bill_no', ascending: false)
             .limit(1)
             .maybeSingle();
         
