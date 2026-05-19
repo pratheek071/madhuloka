@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -9,7 +10,7 @@ import '../../models/order_item_model.dart';
 import 'package:intl/intl.dart';
 
 class BillingService {
-  static Future<void> printInvoice(OrderModel order, {String? title, List<OrderItem>? customItems}) async {
+  static Future<void> printInvoice(OrderModel order, {BuildContext? context, String? title, List<OrderItem>? customItems}) async {
     final pdf = pw.Document();
     final items = customItems ?? order.items;
 
@@ -249,11 +250,15 @@ class BillingService {
       ),
     );
 
-    // This opens the system print dialog which supports both Windows and Mac
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: 'Bill_${order.tableName ?? 'Table'}_$billNoString',
-    );
+    final String filename = 'Bill_${order.tableName ?? 'Table'}_$billNoString';
+    if (context != null) {
+      _showPrintPreviewDialog(context, pdf, filename);
+    } else {
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+        name: filename,
+      );
+    }
   }
 
   static pw.Widget _buildKotPageContent(String title, OrderModel order, List<OrderItem> items) {
@@ -301,7 +306,7 @@ class BillingService {
     );
   }
 
-  static Future<void> printKotAndBot(OrderModel order) async {
+  static Future<void> printKotAndBot(OrderModel order, {BuildContext? context}) async {
     final pdf = pw.Document();
 
     final foodItems = order.items.where((item) {
@@ -350,9 +355,72 @@ class BillingService {
 
     if (!hasAddedPage) return;
 
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: 'KOT_BOT_${order.tableName ?? 'Table'}_${order.id.substring(0, 8)}',
+    final String filename = 'KOT_BOT_${order.tableName ?? 'Table'}_${order.id.substring(0, 8)}';
+    if (context != null) {
+      _showPrintPreviewDialog(context, pdf, filename);
+    } else {
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+        name: filename,
+      );
+    }
+  }
+
+  static void _showPrintPreviewDialog(BuildContext context, pw.Document pdf, String filename) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: const Color(0xFF1E1E1E), // Slate dark theme
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            width: 480,
+            height: 750,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Print Preview',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.deepOrange.shade100,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: PdfPreview(
+                      build: (format) async => pdf.save(),
+                      allowPrinting: true,
+                      allowSharing: false,
+                      canChangePageFormat: false,
+                      canChangeOrientation: false,
+                      canDebug: false,
+                      pdfFileName: '$filename.pdf',
+                      loadingWidget: const Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.deepOrange),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

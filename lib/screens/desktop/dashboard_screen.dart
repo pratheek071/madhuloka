@@ -475,7 +475,7 @@ class _OrderDetailsView extends StatelessWidget {
               Navigator.pop(context);
               if (shouldPrint) {
                 try {
-                  await BillingService.printInvoice(order);
+                  await BillingService.printInvoice(order, context: context);
                 } catch (e) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -499,7 +499,7 @@ class _OrderDetailsView extends StatelessWidget {
               Navigator.pop(context);
               if (shouldPrint) {
                 try {
-                  await BillingService.printInvoice(order);
+                  await BillingService.printInvoice(order, context: context);
                 } catch (e) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -587,13 +587,13 @@ class _OrderDetailsView extends StatelessWidget {
                     color: Colors.orange,
                   ),
                   _ActionButton(
-                    onPressed: () => _safePrint(context, () => BillingService.printKotAndBot(order)),
+                    onPressed: () => _safePrint(context, () => BillingService.printKotAndBot(order, context: context)),
                     icon: Icons.receipt_long,
                     label: 'Print KOT & BOT',
                     color: Colors.brown,
                   ),
                   _ActionButton(
-                    onPressed: () => _safePrint(context, () => BillingService.printInvoice(order)),
+                    onPressed: () => _safePrint(context, () => BillingService.printInvoice(order, context: context)),
                     icon: Icons.print,
                     label: 'Print Bill',
                     color: Colors.teal,
