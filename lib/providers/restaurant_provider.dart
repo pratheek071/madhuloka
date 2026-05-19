@@ -30,12 +30,21 @@ class RestaurantProvider with ChangeNotifier {
     try {
       _tables = await _service.getTables();
       _tables.sort((a, b) {
-        final double? numA = double.tryParse(a.name);
-        final double? numB = double.tryParse(b.name);
-        if (numA != null && numB != null) {
-          return numA.compareTo(numB);
+        final List<String> segsA = a.name.split(RegExp(r'[\.\-\s]+'));
+        final List<String> segsB = b.name.split(RegExp(r'[\.\-\s]+'));
+        for (int i = 0; i < segsA.length && i < segsB.length; i++) {
+          final String sA = segsA[i];
+          final String sB = segsB[i];
+          if (sA != sB) {
+            final int? intA = int.tryParse(sA);
+            final int? intB = int.tryParse(sB);
+            if (intA != null && intB != null) {
+              return intA.compareTo(intB);
+            }
+            return sA.toLowerCase().compareTo(sB.toLowerCase());
+          }
         }
-        return a.name.compareTo(b.name);
+        return segsA.length.compareTo(segsB.length);
       });
       _categories = await _service.getCategories();
       _menuItems = await _service.getMenuItems();

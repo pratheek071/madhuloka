@@ -45,6 +45,18 @@ class _MenuScreenState extends State<MenuScreen> {
                 )
               : Text('Menu - ${widget.table.name}'),
           actions: [
+            if (!_isSearching)
+              Builder(
+                builder: (context) {
+                  return IconButton(
+                    icon: const Icon(Icons.receipt_long),
+                    tooltip: 'Ordered Items',
+                    onPressed: () {
+                      DefaultTabController.of(context).animateTo(provider.categories.length);
+                    },
+                  );
+                },
+              ),
             IconButton(
               icon: Icon(_isSearching ? Icons.close : Icons.search),
               onPressed: () {
@@ -55,7 +67,7 @@ class _MenuScreenState extends State<MenuScreen> {
               },
             ),
           ],
-          bottom: (_isSearching && _searchQuery.isNotEmpty)
+          bottom: _isSearching
               ? null
               : TabBar(
                   isScrollable: true,
