@@ -587,36 +587,10 @@ class _OrderDetailsView extends StatelessWidget {
                     color: Colors.orange,
                   ),
                   _ActionButton(
-                    onPressed: () => _safePrint(context, () async {
-                      final foodItems = order.items.where((item) {
-                        final type = item.itemType.toLowerCase();
-                        return type == 'food';
-                      }).toList();
-                      
-                      // Fallback: If no items are categorized as drinks, print all items as food
-                      final hasDrinks = order.items.any((item) {
-                        final type = item.itemType.toLowerCase();
-                        return type == 'drink' || type == 'cocktail' || type == 'mocktail';
-                      });
-                      
-                      final itemsToPrint = !hasDrinks ? order.items : foodItems;
-                      await BillingService.printInvoice(order, title: 'KOT - FOOD', customItems: itemsToPrint);
-                    }),
-                    icon: Icons.restaurant,
-                    label: 'Print Food',
+                    onPressed: () => _safePrint(context, () => BillingService.printKotAndBot(order)),
+                    icon: Icons.receipt_long,
+                    label: 'Print KOT & BOT',
                     color: Colors.brown,
-                  ),
-                  _ActionButton(
-                    onPressed: () => _safePrint(context, () async {
-                      final drinkItems = order.items.where((item) {
-                        final type = item.itemType.toLowerCase();
-                        return type == 'drink' || type == 'cocktail' || type == 'mocktail';
-                      }).toList();
-                      await BillingService.printInvoice(order, title: 'BOT - DRINKS', customItems: drinkItems);
-                    }),
-                    icon: Icons.local_bar,
-                    label: 'Print Drinks',
-                    color: Colors.purple,
                   ),
                   _ActionButton(
                     onPressed: () => _safePrint(context, () => BillingService.printInvoice(order)),

@@ -224,4 +224,100 @@ class BillingService {
       name: 'Bill_${order.tableName ?? 'Table'}_$billNoString',
     );
   }
+
+  static pw.Widget _buildKotPageContent(String title, OrderModel order, List<OrderItem> items) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        // Simple KOT / BOT Header
+        pw.Center(
+          child: pw.Text(title.toUpperCase(), 
+            style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold)),
+        ),
+        pw.SizedBox(height: 5),
+        pw.Text('Order ID: ${order.id.substring(0, 8).toUpperCase()}', style: const pw.TextStyle(fontSize: 9)),
+        pw.Text('Date: ${DateFormat('dd-MM-yyyy').format(order.createdAt)}', style: const pw.TextStyle(fontSize: 9)),
+        pw.Text('Time: ${DateFormat('hh:mm a').format(order.createdAt)}', style: const pw.TextStyle(fontSize: 9)),
+        pw.Text('Table: ${order.tableName ?? 'Table'}', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+        if (order.customerInfo != null && order.customerInfo!.isNotEmpty)
+          pw.Text('Customer: ${order.customerInfo}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+        
+        pw.SizedBox(height: 5),
+        pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
+        
+        // 2-Column Heading for Kitchen/Bar
+        pw.Row(
+          children: [
+            pw.Expanded(flex: 4, child: pw.Text('Item Name', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))),
+            pw.Expanded(child: pw.Text('Qty', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))),
+          ],
+        ),
+        pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
+        
+        // Bold/Clear Item list for Kitchen/Bar
+        ...items.map((item) => pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(vertical: 3),
+          child: pw.Row(
+            children: [
+              pw.Expanded(flex: 4, child: pw.Text(item.itemName, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold))),
+              pw.Expanded(child: pw.Text(item.quantity.toString(), textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold))),
+            ],
+          ),
+        )),
+        
+        pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
+      ],
+    );
+  }
+
+  static Future<void> printKotAndBot(OrderModel order) async {
+    final pdf = pw.Document();
+
+    final foodItems = order.items.where((item) {
+      final type = item.itemType.toLowerCase();
+      return type == 'food';
+    }).toList();
+
+    final drinkItems = order.items.where((item) {
+      final type = item.itemType.toLowerCase();
+      return type == 'drink' || type == 'cocktail' || type == 'mocktail';
+    }).toList();
+
+    // Fallback: If no items are categorized as drinks, print all items as food KOT
+    final hasDrinks = drinkItems.isNotEmpty;
+    final finalFoodItems = !hasDrinks ? order.items : foodItems;
+
+    // Add KOT - FOOD page
+    if (finalFoodItems.isNotEmpty) {
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.roll80,
+          margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          build: (pw.Context context) {
+            return _buildKotPageContent('KOT - FOOD', order, finalFoodItems);
+          },
+        ),
+      );
+    }
+
+    // Add BOT - DRINKS page
+    if (hasDrinks && drinkItems.isNotEmpty) {
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.roll80,
+          margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          build: (pw.Context context) {
+            return _buildKotPageContent('BOT - DRINKS', order, drinkItems);
+          },
+        ),
+      );
+    }
+
+    if (pdf.pages.isEmpty) return;
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+      name: 'KOT_BOT_${order.tableName ?? 'Table'}_${order.id.substring(0, 8)}',
+    );
+  }
 }
