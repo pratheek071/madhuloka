@@ -140,29 +140,39 @@ class BillingService {
                 pw.SizedBox(height: 5),
                 pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
                 
-                // 4-Column Heading with Prices
+                // 5-Column Heading with Prices
                 pw.Row(
                   children: [
-                    pw.Expanded(flex: 3, child: pw.Text('Item Name', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
-                    pw.Expanded(child: pw.Text('Qty', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
-                    pw.Expanded(child: pw.Text('Price', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
-                    pw.Expanded(child: pw.Text('Total', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                    pw.Expanded(flex: 3, child: pw.Text('Item Name', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                    pw.Expanded(child: pw.Text('Qty', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                    pw.Expanded(child: pw.Text('Menu', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                    pw.Expanded(child: pw.Text('Net', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                    pw.Expanded(child: pw.Text('Total', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                   ],
                 ),
                 pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
                 
                 // Detailed Item list with Prices
-                ...items.map((item) => pw.Padding(
-                  padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                  child: pw.Row(
-                    children: [
-                      pw.Expanded(flex: 3, child: pw.Text(item.itemName, style: const pw.TextStyle(fontSize: 9))),
-                      pw.Expanded(child: pw.Text(item.quantity.toString(), textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 9))),
-                      pw.Expanded(child: pw.Text(item.price.toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 9))),
-                      pw.Expanded(child: pw.Text((item.price * item.quantity).toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 9))),
-                    ],
-                  ),
-                )),
+                ...items.map((item) {
+                  final type = item.itemType.toLowerCase();
+                  final bool isTaxable = type == 'food' || type == 'cocktail' || type == 'mocktail';
+                  final double originalPrice = item.price;
+                  final double taxAddedPrice = isTaxable ? (originalPrice * 1.05) : originalPrice;
+                  final double itemTotal = taxAddedPrice * item.quantity;
+
+                  return pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                    child: pw.Row(
+                      children: [
+                        pw.Expanded(flex: 3, child: pw.Text(item.itemName, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Expanded(child: pw.Text(item.quantity.toString(), textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Expanded(child: pw.Text(originalPrice.toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Expanded(child: pw.Text(taxAddedPrice.toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Expanded(child: pw.Text(itemTotal.toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8))),
+                      ],
+                    ),
+                  );
+                }),
                 
                 pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
                 
@@ -287,8 +297,11 @@ class BillingService {
     final hasDrinks = drinkItems.isNotEmpty;
     final finalFoodItems = !hasDrinks ? order.items : foodItems;
 
+    bool hasAddedPage = false;
+
     // Add KOT - FOOD page
     if (finalFoodItems.isNotEmpty) {
+      hasAddedPage = true;
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.roll80,
@@ -302,6 +315,7 @@ class BillingService {
 
     // Add BOT - DRINKS page
     if (hasDrinks && drinkItems.isNotEmpty) {
+      hasAddedPage = true;
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.roll80,
@@ -313,7 +327,7 @@ class BillingService {
       );
     }
 
-    if (pdf.pages.isEmpty) return;
+    if (!hasAddedPage) return;
 
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),

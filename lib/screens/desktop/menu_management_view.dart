@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider';
+import 'package:provider/provider.dart';
 import '../../providers/restaurant_provider.dart';
 import '../../models/category_model.dart';
 
