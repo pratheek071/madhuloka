@@ -1,5 +1,3 @@
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -8,7 +6,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/order_model.dart';
 import '../../models/order_item_model.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter/services.dart' show rootBundle;
 
 class BillingService {
   static Future<void> printInvoice(OrderModel order, {BuildContext? context, String? title, List<OrderItem>? customItems}) async {
@@ -29,19 +26,6 @@ class BillingService {
     final double discountAmount = total * (discountPercent / 100);
     final double finalTotal = total - discountAmount;
 
-    // Load logo if exists
-    Uint8List? logoBytes;
-    try {
-      final ByteData bytes = await rootBundle.load('assets/MD.png');
-      logoBytes = bytes.buffer.asUint8List();
-    } catch (_) {
-      try {
-        final logoFile = File('customer_web/MD.png');
-        if (logoFile.existsSync()) {
-          logoBytes = Uint8List.fromList(logoFile.readAsBytesSync());
-        }
-      } catch (_) {}
-    }
 
     // Get the next bill number if not already assigned
     int? billNumber = order.billNo;
@@ -130,17 +114,7 @@ class BillingService {
                 
                 pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
               ] else ...[
-                // Logo
-                if (logoBytes != null) ...[
-                  pw.Center(
-                    child: pw.Container(
-                      width: 60,
-                      height: 60,
-                      child: pw.Image(pw.MemoryImage(logoBytes)),
-                    ),
-                  ),
-                  pw.SizedBox(height: 10),
-                ],
+                // Logo removed as of now at top
                 
                 // Full Customer Receipt Business Header
                 pw.Center(
