@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/order_model.dart';
 import '../../models/order_item_model.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
 class BillingService {
   static Future<void> printInvoice(OrderModel order, {BuildContext? context, String? title, List<OrderItem>? customItems}) async {
@@ -31,11 +32,16 @@ class BillingService {
     // Load logo if exists
     Uint8List? logoBytes;
     try {
-      final logoFile = File('customer_web/MD.png');
-      if (logoFile.existsSync()) {
-        logoBytes = Uint8List.fromList(logoFile.readAsBytesSync());
-      }
-    } catch (_) {}
+      final ByteData bytes = await rootBundle.load('assets/MD.png');
+      logoBytes = bytes.buffer.asUint8List();
+    } catch (_) {
+      try {
+        final logoFile = File('customer_web/MD.png');
+        if (logoFile.existsSync()) {
+          logoBytes = Uint8List.fromList(logoFile.readAsBytesSync());
+        }
+      } catch (_) {}
+    }
 
     // Get the next bill number if not already assigned
     int? billNumber = order.billNo;
@@ -228,9 +234,6 @@ class BillingService {
                 // Business Thank You Footer
                 pw.Center(
                   child: pw.Text('THANK YOU!', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                ),
-                pw.Center(
-                  child: pw.Text('MADHULOKA DINING', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
                 ),
                 pw.Center(
                   child: pw.Text('Please Visit Again', style: const pw.TextStyle(fontSize: 9)),
