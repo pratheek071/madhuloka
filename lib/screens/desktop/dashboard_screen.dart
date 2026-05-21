@@ -393,6 +393,7 @@ class _OrderDetailsView extends StatelessWidget {
     }).toList();
 
     String? selectedMenuItemId = menuItems.isNotEmpty ? menuItems.first.id : null;
+    bool isSaving = false;
 
     showDialog(
       context: context,
@@ -492,28 +493,38 @@ class _OrderDetailsView extends StatelessWidget {
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
-              onPressed: () async {
-                final double newTotal = editedItems.fold(0.0, (sum, item) {
-                  double itemPrice = item['price'] * item['quantity'];
-                  final type = item['item_type'].toString().toLowerCase();
-                  if (type == 'food' || type == 'cocktail' || type == 'mocktail') {
-                    itemPrice *= 1.05;
-                  }
-                  return sum + itemPrice;
-                });
-                final itemsToSave = editedItems.map((item) => {
-                  'order_id': order.id,
-                  'menu_item_id': item['menu_item_id'],
-                  'quantity': item['quantity'],
-                  'price': item['price'],
-                }).toList();
-                
-                await SupabaseService().updateOrderItems(order.id, itemsToSave, newTotal);
-                provider.fetchData();
-                Navigator.pop(context);
-                onStatusUpdate();
-              },
-              child: const Text('Save'),
+              onPressed: isSaving 
+                ? null 
+                : () async {
+                    setState(() => isSaving = true);
+                    try {
+                      double newTotal = 0;
+                      final itemsToSave = editedItems.map((item) {
+                        double itemPrice = (item['price'] as num).toDouble();
+                        final type = (item['item_type'] as String).toLowerCase();
+                        if (type == 'food' || type == 'cocktail' || type == 'mocktail') {
+                          itemPrice *= 1.05;
+                        }
+                        newTotal += itemPrice * (item['quantity'] as num).toInt();
+                        return {
+                          'order_id': order.id,
+                          'menu_item_id': item['menu_item_id'],
+                          'quantity': item['quantity'],
+                          'price': item['price'],
+                        };
+                      }).toList();
+                      
+                      await SupabaseService().updateOrderItems(order.id, itemsToSave, newTotal);
+                      provider.fetchData();
+                      if (context.mounted) Navigator.pop(context);
+                      onStatusUpdate();
+                    } finally {
+                      if (context.mounted) setState(() => isSaving = false);
+                    }
+                  },
+              child: isSaving 
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) 
+                : const Text('Save'),
             ),
           ],
         ),

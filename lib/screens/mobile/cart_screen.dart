@@ -66,29 +66,33 @@ class CartScreen extends StatelessWidget {
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: () async {
-                      try {
-                        await provider.submitOrder(table.id);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Order placed successfully!')),
-                          );
-                          Navigator.popUntil(context, (route) => route.isFirst);
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: $e')),
-                          );
-                        }
-                      }
-                    },
+                    onPressed: provider.isSubmitting 
+                      ? null 
+                      : () async {
+                          try {
+                            await provider.submitOrder(table.id);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Order placed successfully!')),
+                              );
+                              Navigator.popUntil(context, (route) => route.isFirst);
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')),
+                              );
+                            }
+                          }
+                        },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.deepOrange,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Confirm & Place Order', style: TextStyle(fontSize: 18)),
+                    child: provider.isSubmitting 
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('Confirm & Place Order', style: TextStyle(fontSize: 18)),
                   ),
                 ),
               ],

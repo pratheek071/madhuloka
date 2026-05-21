@@ -174,7 +174,7 @@ class _TakeawayViewState extends State<TakeawayView> {
                     width: double.infinity,
                     height: 60,
                     child: ElevatedButton(
-                      onPressed: provider.cart.isEmpty 
+                      onPressed: (provider.cart.isEmpty || provider.isSubmitting)
                         ? null 
                         : () async {
                             await provider.submitParcelOrder(_customerController.text);
@@ -189,7 +189,9 @@ class _TakeawayViewState extends State<TakeawayView> {
                         backgroundColor: Colors.deepOrange,
                         foregroundColor: Colors.white,
                       ),
-                      child: const Text('Confirm Parcel Order', style: TextStyle(fontSize: 18)),
+                      child: provider.isSubmitting 
+                        ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Confirm Parcel Order', style: TextStyle(fontSize: 18)),
                     ),
                   ),
                 ],

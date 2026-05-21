@@ -58,8 +58,10 @@ class RestaurantProvider with ChangeNotifier {
 
   // Cart State (Temporary local state for mobile order taking)
   final Map<String, int> _cart = {}; // menuItemId -> quantity
+  bool _isSubmitting = false;
 
   Map<String, int> get cart => _cart;
+  bool get isSubmitting => _isSubmitting;
 
   void addToCart(String itemId) {
     print("Adding to cart: $itemId");
@@ -102,43 +104,63 @@ class RestaurantProvider with ChangeNotifier {
   }
 
   Future<void> submitOrder(String tableId) async {
-    List<Map<String, dynamic>> items = [];
-    _cart.forEach((itemId, qty) {
-      final item = _menuItems.firstWhere((m) => m.id == itemId);
-      items.add({
-        'menu_item_id': itemId,
-        'quantity': qty,
-        'price': item.price,
-      });
-    });
-
-    // Check if table is occupied to decide between New or Append
-    final activeOrder = await _service.getActiveOrderForTable(tableId);
-
-    if (activeOrder != null) {
-      await _service.appendItemsToOrder(activeOrder.id, items, cartTotal);
-    } else {
-      await _service.placeOrder(tableId, items, cartTotal);
-    }
+    if (_isSubmitting) return;
     
-    clearCart();
-    await fetchData(); // Refresh tables status
+    _isSubmitting = true;
+    notifyListeners();
+    
+    try {
+      List<Map<String, dynamic>> items = [];
+      _cart.forEach((itemId, qty) {
+        final item = _menuItems.firstWhere((m) => m.id == itemId);
+        items.add({
+          'menu_item_id': itemId,
+          'quantity': qty,
+          'price': item.price,
+        });
+      });
+
+      // Check if table is occupied to decide between New or Append
+      final activeOrder = await _service.getActiveOrderForTable(tableId);
+
+      if (activeOrder != null) {
+        await _service.appendItemsToOrder(activeOrder.id, items, cartTotal);
+      } else {
+        await _service.placeOrder(tableId, items, cartTotal);
+      }
+      
+      clearCart();
+      await fetchData(); // Refresh tables status
+    } finally {
+      _isSubmitting = false;
+      notifyListeners();
+    }
   }
 
   Future<void> submitParcelOrder(String? customerInfo) async {
-    List<Map<String, dynamic>> items = [];
-    _cart.forEach((itemId, qty) {
-      final item = _menuItems.firstWhere((m) => m.id == itemId);
-      items.add({
-        'menu_item_id': itemId,
-        'quantity': qty,
-        'price': item.price,
-      });
-    });
+    if (_isSubmitting) return;
+    
+    _isSubmitting = true;
+    notifyListeners();
 
-    await _service.placeParcelOrder(items, cartTotal, customerInfo);
-    clearCart();
-    await fetchData();
+    try {
+      List<Map<String, dynamic>> items = [];
+      _cart.forEach((itemId, qty) {
+        final item = _menuItems.firstWhere((m) => m.id == itemId);
+        items.add({
+          'menu_item_id': itemId,
+          'quantity': qty,
+          'price': item.price,
+        });
+      });
+
+      await _service.placeParcelOrder(items, cartTotal, customerInfo);
+      clearCart();
+      await fetchData();
+    } finally {
+      _isSubmitting = false;
+      notifyListeners();
+    }
   }
 
   // --- Sales Reporting ---
