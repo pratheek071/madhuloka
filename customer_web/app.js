@@ -485,6 +485,7 @@ async function placeOrder() {
         order_id: item.order_id,
         menu_item_id: item.menu_item_id,
         quantity: item.quantity,
+        printed_quantity: item.printed_quantity || 0,
         price: item.price
       };
     });

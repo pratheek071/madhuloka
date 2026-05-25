@@ -244,10 +244,14 @@ class _MenuScreenState extends State<MenuScreen> {
       int quantity = item.id == targetItem.id ? newQuantity : item.quantity;
       if (quantity <= 0) continue; // Deleted/omitted
 
+      final int origPrinted = item.printedQuantity;
+      final int finalPrinted = origPrinted > quantity ? quantity : origPrinted;
+
       itemsToSave.add({
         'order_id': order.id,
         'menu_item_id': item.menuItemId,
         'quantity': quantity,
+        'printed_quantity': finalPrinted,
         'price': item.price,
         'instructions': item.instructions ?? '',
       });
