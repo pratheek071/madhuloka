@@ -244,6 +244,7 @@ class _MenuScreenState extends State<MenuScreen> {
         'menu_item_id': item.menuItemId,
         'quantity': quantity,
         'price': item.price,
+        'instructions': item.instructions ?? '',
       });
 
       double itemPrice = item.price * quantity;
@@ -509,7 +510,24 @@ class _MenuScreenState extends State<MenuScreen> {
                         elevation: 1,
                         child: ListTile(
                           title: Text(item.itemName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('₹${item.price.toStringAsFixed(2)} each\nTotal: ₹${(item.price * item.quantity).toStringAsFixed(2)}'),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('₹${item.price.toStringAsFixed(2)} each\nTotal: ₹${(item.price * item.quantity).toStringAsFixed(2)}'),
+                              if (item.instructions != null && item.instructions!.trim().isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Note: ${item.instructions}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontStyle: FontStyle.italic,
+                                    color: Colors.grey.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                           isThreeLine: true,
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,

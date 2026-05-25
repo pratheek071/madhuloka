@@ -289,7 +289,8 @@ class BillingService {
                 quantity: item.quantity - item.printedQuantity,
                 printedQuantity: item.printedQuantity,
                 price: item.price,
-                itemType: item.itemType))
+                itemType: item.itemType,
+                instructions: item.instructions))
             .toList();
 
     if (newItemsToPrint.isEmpty) {
