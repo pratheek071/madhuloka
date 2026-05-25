@@ -24,6 +24,7 @@ class DesktopDashboard extends StatefulWidget {
 class _DesktopDashboardState extends State<DesktopDashboard> {
   final SupabaseService _service = SupabaseService();
   String? _selectedOrderId;
+  int _detailsRefreshCounter = 0;
 
   @override
   void initState() {
@@ -163,7 +164,7 @@ class _DesktopDashboardState extends State<DesktopDashboard> {
                   child: _selectedOrderId == null
                       ? _buildEmptyState('Select an order to view details')
                       : FutureBuilder<OrderModel>(
-                          key: ValueKey('$_selectedOrderId-${orders.map((o) => "${o.totalAmount}-${o.discount}").join("-")}'),
+                          key: ValueKey('$_selectedOrderId-$_detailsRefreshCounter-${orders.map((o) => "${o.totalAmount}-${o.discount}").join("-")}'),
                           future: _service.getOrderDetails(_selectedOrderId!),
                           builder: (context, detailsSnapshot) {
                             if (detailsSnapshot.hasError) {
@@ -186,6 +187,11 @@ class _DesktopDashboardState extends State<DesktopDashboard> {
                               onStatusUpdate: () {
                                 setState(() {
                                   _selectedOrderId = null;
+                                });
+                              },
+                              onRefresh: () {
+                                setState(() {
+                                  _detailsRefreshCounter++;
                                 });
                               },
                             );
@@ -316,8 +322,13 @@ class _OrderSidebarCard extends StatelessWidget {
 class _OrderDetailsView extends StatelessWidget {
   final OrderModel order;
   final VoidCallback onStatusUpdate;
+  final VoidCallback? onRefresh;
 
-  const _OrderDetailsView({required this.order, required this.onStatusUpdate});
+  const _OrderDetailsView({
+    required this.order, 
+    required this.onStatusUpdate,
+    this.onRefresh,
+  });
 
   Future<void> _safePrint(BuildContext context, Future<void> Function() printFn) async {
     try {
@@ -540,7 +551,7 @@ class _OrderDetailsView extends StatelessWidget {
                     color: Colors.purple,
                   ),
                   _ActionButton(
-                    onPressed: () => _safePrint(context, () => BillingService.printKotAndBot(order, context: context)),
+                    onPressed: () => _safePrint(context, () => BillingService.printKotAndBot(order, context: context, onPrintComplete: onRefresh)),
                     icon: Icons.receipt_long,
                     label: 'Print KOT & BOT',
                     color: Colors.brown,

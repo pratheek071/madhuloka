@@ -259,7 +259,11 @@ class BillingService {
     );
   }
 
-  static Future<void> printKotAndBot(OrderModel order, {BuildContext? context, bool forcePrintAll = false}) async {
+  static Future<void> printKotAndBot(OrderModel order, {
+    BuildContext? context, 
+    bool forcePrintAll = false,
+    VoidCallback? onPrintComplete,
+  }) async {
     final newItemsToPrint = forcePrintAll
         ? order.items
         : order.items
@@ -337,7 +341,14 @@ class BillingService {
 
     final String filename = 'KOT_BOT_${order.tableName ?? 'Table'}_${order.id.substring(0, 8)}';
     if (context != null) {
-      _showPrintPreviewDialog(context, combinedPdf, filename, separateJobs: printJobs, orderToMark: forcePrintAll ? null : order);
+      _showPrintPreviewDialog(
+        context, 
+        combinedPdf, 
+        filename, 
+        separateJobs: printJobs, 
+        orderToMark: forcePrintAll ? null : order,
+        onPrintComplete: onPrintComplete,
+      );
     } else {
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => combinedPdf.save(),
@@ -345,6 +356,9 @@ class BillingService {
       );
       if (!forcePrintAll) {
         await SupabaseService().markOrderAsPrinted(order.id);
+        if (onPrintComplete != null) {
+          onPrintComplete();
+        }
       }
     }
   }
@@ -357,6 +371,7 @@ class BillingService {
     OrderModel? orderToMark,
     OrderModel? invoiceOrder,
     List<OrderItem>? customItems,
+    VoidCallback? onPrintComplete,
   }) {
     showDialog(
       context: context,
@@ -465,12 +480,24 @@ class BillingService {
                                 context.read<RestaurantProvider>().fetchData();
                               }
                             } else if (separateJobs != null) {
-                              await Printing.layoutPdf(
-                                onLayout: (format) async => pdf.save(),
-                                name: filename,
-                              );
+                              for (int i = 0; i < separateJobs.length; i++) {
+                                try {
+                                  await Printing.layoutPdf(
+                                    onLayout: (format) async => separateJobs[i].save(),
+                                    name: '${filename}_part$i',
+                                  );
+                                } catch (e) {
+                                  debugPrint("KOT/BOT Printing error: $e");
+                                }
+                                if (i < separateJobs.length - 1) {
+                                  await Future.delayed(const Duration(milliseconds: 1000));
+                                }
+                              }
                               if (orderToMark != null) {
                                 await SupabaseService().markOrderAsPrinted(orderToMark.id);
+                                if (onPrintComplete != null) {
+                                  onPrintComplete();
+                                }
                                 if (context.mounted) {
                                   context.read<RestaurantProvider>().fetchData();
                                 }
