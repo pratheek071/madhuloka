@@ -339,12 +339,10 @@ class BillingService {
     if (context != null) {
       _showPrintPreviewDialog(context, combinedPdf, filename, separateJobs: printJobs, orderToMark: forcePrintAll ? null : order);
     } else {
-      for (var job in printJobs) {
-        await Printing.layoutPdf(
-          onLayout: (PdfPageFormat format) async => job.save(),
-          name: filename,
-        );
-      }
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => combinedPdf.save(),
+        name: filename,
+      );
       if (!forcePrintAll) {
         await SupabaseService().markOrderAsPrinted(order.id);
       }
@@ -467,12 +465,10 @@ class BillingService {
                                 context.read<RestaurantProvider>().fetchData();
                               }
                             } else if (separateJobs != null) {
-                              for (int i = 0; i < separateJobs.length; i++) {
-                                await Printing.layoutPdf(
-                                  onLayout: (format) async => separateJobs[i].save(),
-                                  name: '${filename}_part$i',
-                                );
-                              }
+                              await Printing.layoutPdf(
+                                onLayout: (format) async => pdf.save(),
+                                name: filename,
+                              );
                               if (orderToMark != null) {
                                 await SupabaseService().markOrderAsPrinted(orderToMark.id);
                                 if (context.mounted) {
