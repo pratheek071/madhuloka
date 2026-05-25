@@ -64,7 +64,12 @@ class _DesktopDashboardState extends State<DesktopDashboard> {
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh),
-              onPressed: () => context.read<RestaurantProvider>().fetchData(),
+              onPressed: () {
+                context.read<RestaurantProvider>().fetchData();
+                setState(() {
+                  _detailsRefreshCounter++;
+                });
+              },
             ),
             const SizedBox(width: 16),
           ],
@@ -87,6 +92,7 @@ class _DesktopDashboardState extends State<DesktopDashboard> {
     return Consumer<RestaurantProvider>(
       builder: (context, provider, child) {
         return StreamBuilder<List<OrderModel>>(
+          key: ValueKey('Stream-$_detailsRefreshCounter'),
           stream: _service.watchActiveOrders(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
@@ -420,7 +426,7 @@ class _OrderDetailsView extends StatelessWidget {
       context: context,
       builder: (context) => _EditOrderDialog(
         order: order,
-        onStatusUpdate: onStatusUpdate,
+        onStatusUpdate: onRefresh ?? () {},
       ),
     );
   }
