@@ -214,17 +214,22 @@ class _MenuScreenState extends State<MenuScreen> {
                 ],
               ),
         floatingActionButton: provider.cart.isNotEmpty
-            ? FloatingActionButton.extended(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CartScreen(table: widget.table, customerName: widget.customerName),
-                    ),
-                  );
-                },
-                label: Text('View Order (${provider.cart.length})'),
-                icon: const Icon(Icons.shopping_basket),
+            ? Builder(
+                builder: (context) => FloatingActionButton.extended(
+                  onPressed: () async {
+                    final didPlaceOrder = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CartScreen(table: widget.table, customerName: widget.customerName),
+                      ),
+                    );
+                    if (didPlaceOrder == true && context.mounted) {
+                      DefaultTabController.of(context).animateTo(provider.categories.length);
+                    }
+                  },
+                  label: Text('View Order (${provider.cart.length})'),
+                  icon: const Icon(Icons.shopping_basket),
+                ),
               )
             : null,
       ),

@@ -145,13 +145,13 @@ class _CartScreenState extends State<CartScreen> {
                       ? null 
                       : () async {
                           try {
-                            await provider.submitOrder(widget.table.id, customerInfo: widget.customerName);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Order placed successfully!')),
-                              );
-                              Navigator.popUntil(context, (route) => route.isFirst);
-                            }
+                             await provider.submitOrder(widget.table.id, customerInfo: widget.customerName);
+                             if (context.mounted) {
+                               ScaffoldMessenger.of(context).showSnackBar(
+                                 const SnackBar(content: Text('Order placed successfully!')),
+                               );
+                               Navigator.pop(context, true);
+                             }
                           } catch (e) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
