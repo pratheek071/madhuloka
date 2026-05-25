@@ -495,10 +495,12 @@ class BillingService {
                               }
                             } else if (separateJobs != null) {
                               for (int i = 0; i < separateJobs.length; i++) {
+                                final job = separateJobs[i];
+                                final jobName = '${filename}_part$i';
                                 try {
                                   await Printing.layoutPdf(
-                                    onLayout: (format) async => separateJobs[i].save(),
-                                    name: '${filename}_part$i',
+                                    onLayout: (format) async => job.save(),
+                                    name: jobName,
                                   );
                                 } catch (e) {
                                   debugPrint("KOT/BOT Printing error: $e");

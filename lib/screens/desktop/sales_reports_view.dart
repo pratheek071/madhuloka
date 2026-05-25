@@ -356,6 +356,8 @@ class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepA
         borderRadius: BorderRadius.circular(16),
         child: SingleChildScrollView(
           child: DataTable(
+            dataRowMinHeight: 56,
+            dataRowMaxHeight: 56,
             headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
             columnSpacing: 24,
             columns: const [
@@ -381,7 +383,23 @@ class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepA
                     ? 'REG-${order.billNo.toString().padLeft(4, '0')}' 
                     : 'N/A', 
                     style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey))),
-                  DataCell(Text(DateFormat('HH:mm, dd MMM').format(order.completedAt ?? order.createdAt))),
+                  DataCell(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          DateFormat('hh:mm a').format(order.completedAt ?? order.createdAt),
+                          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          DateFormat('dd MMM yyyy').format(order.completedAt ?? order.createdAt),
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
                   DataCell(Text(order.isParcel 
                     ? 'Parcel: ${order.customerInfo ?? "N/A"}' 
                     : (order.tableName ?? 'Table'))),
