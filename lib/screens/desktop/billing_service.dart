@@ -74,7 +74,7 @@ class BillingService {
                   style: pw.TextStyle(fontSize: 9, fontStyle: pw.FontStyle.italic)),
               ),
               pw.Center(
-                child: pw.Text('RC conforts Belur Road Chikmagalur 577101', style: const pw.TextStyle(fontSize: 8)),
+                child: pw.Text('RC Comforts Belur Road Chikmagalur 577101', style: const pw.TextStyle(fontSize: 8)),
               ),
               pw.SizedBox(height: 10),
               
