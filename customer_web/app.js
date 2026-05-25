@@ -372,11 +372,16 @@ function removeFromCartModal(itemId) {
   }
 }
 
+var isSubmittingOrder = false;
+
 // ---- PLACE ORDER ----
 async function placeOrder() {
+  if (isSubmittingOrder) return;
+  
   var totalItems = Object.values(cart).reduce(function(s, q) { return s + q; }, 0);
   if (totalItems === 0) return;
 
+  isSubmittingOrder = true;
   var btn = document.getElementById('place-order-btn');
   var btnText = btn.querySelector('.btn-text');
   var btnLoader = btn.querySelector('.btn-loader');
@@ -439,13 +444,52 @@ async function placeOrder() {
       orderId = orderResult.data.id;
     }
 
-    // Insert items (common for both cases)
-    var orderItems = Object.entries(cart).map(function(entry) {
-      var item = menuItems.find(function(m) { return m.id === entry[0]; });
-      return { order_id: orderId, menu_item_id: entry[0], quantity: entry[1], price: item.price };
+    // We need to fetch existing items first to merge quantities, avoiding duplicate rows
+    var existingItems = [];
+    if (existingOrder) {
+      var itemsResult = await sb.from('order_items').select('*').eq('order_id', orderId);
+      if (!itemsResult.error && itemsResult.data) {
+        existingItems = itemsResult.data;
+      }
+    }
+
+    var mergedItems = [...existingItems];
+
+    Object.entries(cart).forEach(function(entry) {
+      var menuItemId = entry[0];
+      var quantity = entry[1];
+      var itemData = menuItems.find(function(m) { return m.id === menuItemId; });
+      var price = itemData ? itemData.price : 0;
+
+      var existingIndex = mergedItems.findIndex(function(i) { return i.menu_item_id === menuItemId; });
+      if (existingIndex >= 0) {
+        mergedItems[existingIndex].quantity = Number(mergedItems[existingIndex].quantity) + Number(quantity);
+      } else {
+        mergedItems.push({
+          order_id: orderId,
+          menu_item_id: menuItemId,
+          quantity: quantity,
+          price: price
+        });
+      }
     });
 
-    var insertResult = await sb.from('order_items').insert(orderItems);
+    if (existingOrder) {
+      // Delete old items so we can re-insert the merged list cleanly
+      await sb.from('order_items').delete().eq('order_id', orderId);
+    }
+
+    // Clean up IDs before inserting so Supabase generates new ones
+    var itemsToInsert = mergedItems.map(function(item) {
+      return {
+        order_id: item.order_id,
+        menu_item_id: item.menu_item_id,
+        quantity: item.quantity,
+        price: item.price
+      };
+    });
+
+    var insertResult = await sb.from('order_items').insert(itemsToInsert);
     if (insertResult.error) throw insertResult.error;
 
     // Update table status if needed
@@ -462,6 +506,8 @@ async function placeOrder() {
     btn.disabled = false;
     btnText.textContent = 'Place Order';
     btnLoader.classList.add('hidden');
+  } finally {
+    isSubmittingOrder = false;
   }
 }
 
@@ -473,6 +519,7 @@ function showSuccess() {
 
 function resetForNewOrder() {
   cart = {};
+  isSubmittingOrder = false;
   updateCartBar();
   renderMenu();
   document.getElementById('success-screen').classList.add('hidden');

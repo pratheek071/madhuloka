@@ -250,8 +250,32 @@ class _OrderSidebarCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(tableName, 
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(tableName, 
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
+                      if (order.billNo != null) ...[
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade50,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.amber.shade200),
+                          ),
+                          child: Text(
+                            'BILL PENDING',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amber.shade800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
                 Text('₹${order.totalAmount.toStringAsFixed(0)}', 
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.deepOrange)),
@@ -381,153 +405,11 @@ class _OrderDetailsView extends StatelessWidget {
   }
 
   void _showEditOrderDialog(BuildContext context, OrderModel order) {
-    final provider = context.read<RestaurantProvider>();
-    final menuItems = provider.menuItems;
-    
-    List<Map<String, dynamic>> editedItems = order.items.map((item) => {
-      'menu_item_id': item.menuItemId,
-      'quantity': item.quantity,
-      'price': item.price,
-      'name': item.itemName,
-      'item_type': item.itemType,
-    }).toList();
-
-    String? selectedMenuItemId = menuItems.isNotEmpty ? menuItems.first.id : null;
-    bool isSaving = false;
-
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text('Edit Order #${order.id.substring(0,8)}'),
-          content: SizedBox(
-            width: 600,
-            height: 400,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: selectedMenuItemId,
-                        items: menuItems.map((m) => DropdownMenuItem(value: m.id, child: Text(m.name))).toList(),
-                        onChanged: (val) => setState(() => selectedMenuItemId = val),
-                        decoration: const InputDecoration(labelText: 'Select Item to Add'),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    ElevatedButton(
-                      onPressed: () {
-                        if (selectedMenuItemId != null) {
-                          final item = menuItems.firstWhere((m) => m.id == selectedMenuItemId);
-                          setState(() {
-                            final existingIndex = editedItems.indexWhere((i) => i['menu_item_id'] == item.id);
-                            if (existingIndex >= 0) {
-                              editedItems[existingIndex]['quantity'] += 1;
-                            } else {
-                              editedItems.add({
-                                'menu_item_id': item.id,
-                                'quantity': 1,
-                                'price': item.price,
-                                'name': item.name,
-                                'item_type': item.itemType,
-                              });
-                            }
-                          });
-                        }
-                      },
-                      child: const Text('Add'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: editedItems.length,
-                    itemBuilder: (context, index) {
-                      final item = editedItems[index];
-                      return ListTile(
-                        title: Text(item['name'] ?? 'Unknown'),
-                        subtitle: Text('₹${item['price']} x ${item['quantity']}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove),
-                              onPressed: () {
-                                setState(() {
-                                  if (item['quantity'] > 1) {
-                                    item['quantity'] -= 1;
-                                  } else {
-                                    editedItems.removeAt(index);
-                                  }
-                                });
-                              },
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add),
-                              onPressed: () {
-                                setState(() {
-                                  item['quantity'] += 1;
-                                });
-                              },
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () {
-                                setState(() {
-                                  editedItems.removeAt(index);
-                                });
-                              },
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: isSaving 
-                ? null 
-                : () async {
-                    setState(() => isSaving = true);
-                    try {
-                      double newTotal = 0;
-                      final itemsToSave = editedItems.map((item) {
-                        double itemPrice = (item['price'] as num).toDouble();
-                        final type = (item['item_type'] as String).toLowerCase();
-                        if (type == 'food' || type == 'cocktail' || type == 'mocktail') {
-                          itemPrice *= 1.05;
-                        }
-                        newTotal += itemPrice * (item['quantity'] as num).toInt();
-                        return {
-                          'order_id': order.id,
-                          'menu_item_id': item['menu_item_id'],
-                          'quantity': item['quantity'],
-                          'price': item['price'],
-                        };
-                      }).toList();
-                      
-                      await SupabaseService().updateOrderItems(order.id, itemsToSave, newTotal);
-                      provider.fetchData();
-                      if (context.mounted) Navigator.pop(context);
-                      onStatusUpdate();
-                    } finally {
-                      if (context.mounted) setState(() => isSaving = false);
-                    }
-                  },
-              child: isSaving 
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) 
-                : const Text('Save'),
-            ),
-          ],
-        ),
+      builder: (context) => _EditOrderDialog(
+        order: order,
+        onStatusUpdate: onStatusUpdate,
       ),
     );
   }
@@ -868,3 +750,309 @@ class _TotalRow extends StatelessWidget {
     );
   }
 }
+
+class _EditOrderDialog extends StatefulWidget {
+  final OrderModel order;
+  final VoidCallback onStatusUpdate;
+
+  const _EditOrderDialog({
+    required this.order,
+    required this.onStatusUpdate,
+  });
+
+  @override
+  State<_EditOrderDialog> createState() => _EditOrderDialogState();
+}
+
+class _EditOrderDialogState extends State<_EditOrderDialog> {
+  late List<Map<String, dynamic>> _editedItems;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _editedItems = widget.order.items.map((item) => <String, dynamic>{
+      'menu_item_id': item.menuItemId,
+      'quantity': item.quantity,
+      'printed_quantity': item.printedQuantity,
+      'price': item.price,
+      'name': item.itemName,
+      'item_type': item.itemType,
+    }).toList();
+  }
+
+  Map<String, double> _calculateTotals() {
+    double subtotal = 0;
+    double gstAmount = 0;
+    
+    for (var item in _editedItems) {
+      double itemPrice = (item['price'] as num).toDouble();
+      final type = (item['item_type'] as String).toLowerCase();
+      final qty = (item['quantity'] as num).toInt();
+      
+      final linePrice = itemPrice * qty;
+      subtotal += linePrice;
+      
+      if (type == 'food' || type == 'cocktail' || type == 'mocktail') {
+        gstAmount += linePrice * 0.05;
+      }
+    }
+    
+    final totalBeforeDiscount = subtotal + gstAmount;
+    final discountPercent = widget.order.discount;
+    final discountAmount = totalBeforeDiscount * (discountPercent / 100);
+    final finalTotal = totalBeforeDiscount - discountAmount;
+    
+    return {
+      'subtotal': subtotal,
+      'gst': gstAmount,
+      'discount': discountAmount,
+      'finalTotal': finalTotal,
+    };
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<RestaurantProvider>();
+    final menuItems = provider.menuItems;
+
+    final searchResults = _searchQuery.isEmpty
+        ? <MenuItem>[]
+        : menuItems.where((item) =>
+            item.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+
+    return AlertDialog(
+      title: Text('Edit Order #${widget.order.id.substring(0, 8)}'),
+      content: SizedBox(
+        width: 600,
+        height: 450,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Search Input
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search items by name...',
+                prefixIcon: const Icon(Icons.search),
+                border: const OutlineInputBorder(),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            _searchQuery = '';
+                            _searchController.clear();
+                          });
+                        },
+                      )
+                    : null,
+              ),
+              onChanged: (val) {
+                setState(() {
+                  _searchQuery = val;
+                });
+              },
+            ),
+            
+            // Search Results
+            if (_searchQuery.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 150),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  border: Border.all(color: Colors.grey.shade200),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: searchResults.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Center(child: Text('No matching items found', style: TextStyle(color: Colors.grey))),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: searchResults.length,
+                        itemBuilder: (context, index) {
+                          final item = searchResults[index];
+                          return ListTile(
+                            dense: true,
+                            title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                            subtitle: Text('₹${item.price} • ${item.itemType}'),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.add_circle, color: Colors.deepOrange),
+                              onPressed: () {
+                                setState(() {
+                                  final existingIndex = _editedItems.indexWhere((i) => i['menu_item_id'] == item.id);
+                                  if (existingIndex >= 0) {
+                                    _editedItems[existingIndex]['quantity'] += 1;
+                                  } else {
+                                    _editedItems.add(<String, dynamic>{
+                                      'menu_item_id': item.id,
+                                      'quantity': 1,
+                                      'printed_quantity': 0,
+                                      'price': item.price,
+                                      'name': item.name,
+                                      'item_type': item.itemType,
+                                    });
+                                  }
+                                  // Clear search query after adding
+                                  _searchQuery = '';
+                                  _searchController.clear();
+                                });
+                              },
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+            
+            const SizedBox(height: 16),
+            
+            // Items List
+            Expanded(
+              child: _editedItems.isEmpty
+                  ? const Center(child: Text('No items in this order.', style: TextStyle(color: Colors.grey)))
+                  : ListView.builder(
+                      itemCount: _editedItems.length,
+                      itemBuilder: (context, index) {
+                        final item = _editedItems[index];
+                        return ListTile(
+                          title: Text(item['name'] ?? 'Unknown'),
+                          subtitle: Text('₹${item['price']} x ${item['quantity']}'),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.remove),
+                                onPressed: () {
+                                  setState(() {
+                                    if (item['quantity'] > 1) {
+                                      item['quantity'] -= 1;
+                                    } else {
+                                      _editedItems.removeAt(index);
+                                    }
+                                  });
+                                },
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.add),
+                                onPressed: () {
+                                  setState(() {
+                                    item['quantity'] += 1;
+                                  });
+                                },
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () {
+                                  setState(() {
+                                    _editedItems.removeAt(index);
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Builder(
+                builder: (context) {
+                  final totals = _calculateTotals();
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Total Items: ${_editedItems.fold(0, (sum, item) => sum + (item['quantity'] as num).toInt())}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (widget.order.discount > 0) ...[
+                            Text(
+                              'Subtotal (with tax): ₹${(totals['subtotal']! + totals['gst']!).toStringAsFixed(2)}',
+                              style: const TextStyle(color: Colors.grey, fontSize: 13),
+                            ),
+                            Text(
+                              'Discount (${widget.order.discount.toStringAsFixed(0)}%): -₹${totals['discount']!.toStringAsFixed(2)}',
+                              style: const TextStyle(color: Colors.purple, fontSize: 13, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                          Text(
+                            'Grand Total: ₹${totals['finalTotal']!.toStringAsFixed(2)}',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.deepOrange),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                }
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isSaving
+              ? null
+              : () async {
+                  setState(() => _isSaving = true);
+                  try {
+                    double newTotal = 0;
+                    final itemsToSave = _editedItems.map((item) {
+                      double itemPrice = (item['price'] as num).toDouble();
+                      final type = (item['item_type'] as String).toLowerCase();
+                      if (type == 'food' || type == 'cocktail' || type == 'mocktail') {
+                        itemPrice *= 1.05;
+                      }
+                      newTotal += itemPrice * (item['quantity'] as num).toInt();
+                      
+                      final int newQty = (item['quantity'] as num).toInt();
+                      final int origPrinted = (item['printed_quantity'] as num?)?.toInt() ?? 0;
+                      final int finalPrinted = origPrinted > newQty ? newQty : origPrinted;
+
+                      return {
+                        'order_id': widget.order.id,
+                        'menu_item_id': item['menu_item_id'],
+                        'quantity': newQty,
+                        'printed_quantity': finalPrinted,
+                        'price': item['price'],
+                      };
+                    }).toList();
+
+                    await SupabaseService().updateOrderItems(widget.order.id, itemsToSave, newTotal);
+                    provider.fetchData();
+                    if (context.mounted) Navigator.pop(context);
+                    widget.onStatusUpdate();
+                  } finally {
+                    if (context.mounted) setState(() => _isSaving = false);
+                  }
+                },
+          child: _isSaving
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+

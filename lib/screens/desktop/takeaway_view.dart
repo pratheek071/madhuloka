@@ -10,9 +10,12 @@ class TakeawayView extends StatefulWidget {
   State<TakeawayView> createState() => _TakeawayViewState();
 }
 
-class _TakeawayViewState extends State<TakeawayView> {
+class _TakeawayViewState extends State<TakeawayView> with AutomaticKeepAliveClientMixin {
   final TextEditingController _customerController = TextEditingController();
   String _searchQuery = '';
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void dispose() {
@@ -56,6 +59,7 @@ class _TakeawayViewState extends State<TakeawayView> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final provider = context.watch<RestaurantProvider>();
     print("TakeawayView Build: Cart Size = ${provider.cart.length}");
 

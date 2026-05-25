@@ -71,4 +71,8 @@ class OrderModel {
   }
 
   bool get isCustomerOrder => orderSource == 'customer';
+
+  double get discountAmount => totalAmount * (discount / 100);
+  
+  double get finalAmount => totalAmount - discountAmount;
 }

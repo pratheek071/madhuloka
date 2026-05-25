@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/restaurant_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../models/table_model.dart';
+import '../../models/order_model.dart';
 import 'menu_screen.dart';
 
 class TableSelectionScreen extends StatefulWidget {
@@ -94,6 +95,59 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
     );
   }
 
+  void _showCustomerNameDialog(BuildContext context, RestaurantTable table) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Customer Name - ${table.name}'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Enter customer name (optional)',
+            prefixIcon: Icon(Icons.person),
+          ),
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MenuScreen(table: table),
+                ),
+              );
+            },
+            child: const Text('Skip'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = controller.text.trim();
+              Navigator.pop(dialogContext);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MenuScreen(
+                    table: table,
+                    customerName: name.isNotEmpty ? name : null,
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepOrange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -152,12 +206,16 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
                 children: [
                   InkWell(
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => MenuScreen(table: table),
-                        ),
-                      );
+                      if (isOccupied) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => MenuScreen(table: table),
+                          ),
+                        );
+                      } else {
+                        _showCustomerNameDialog(context, table);
+                      }
                     },
                     child: SizedBox(
                       width: double.infinity,
@@ -183,6 +241,28 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
                                 color: isOccupied ? Colors.orange.shade900 : Colors.green.shade900,
                               ),
                             ),
+                            if (isOccupied)
+                              StreamBuilder<OrderModel?>(
+                                stream: SupabaseService().watchActiveOrderForTable(table.id),
+                                builder: (context, orderSnapshot) {
+                                  if (orderSnapshot.hasData && orderSnapshot.data?.customerInfo != null && orderSnapshot.data!.customerInfo!.isNotEmpty) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 4.0),
+                                      child: Text(
+                                        orderSnapshot.data!.customerInfo!,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.orange.shade800,
+                                          fontSize: 14,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                              ),
                             Text(
                               isOccupied ? 'Occupied' : 'Available',
                               style: TextStyle(

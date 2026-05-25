@@ -83,6 +83,14 @@ class RestaurantProvider with ChangeNotifier {
     }
   }
 
+  void deleteFromCart(String itemId) {
+    print("Deleting from cart: $itemId");
+    if (_cart.containsKey(itemId)) {
+      _cart.remove(itemId);
+      notifyListeners();
+    }
+  }
+
   void clearCart() {
     print("Clearing cart");
     _cart.clear();
@@ -103,7 +111,7 @@ class RestaurantProvider with ChangeNotifier {
     return total;
   }
 
-  Future<void> submitOrder(String tableId) async {
+  Future<void> submitOrder(String tableId, {String? customerInfo}) async {
     if (_isSubmitting) return;
     
     _isSubmitting = true;
@@ -126,7 +134,7 @@ class RestaurantProvider with ChangeNotifier {
       if (activeOrder != null) {
         await _service.appendItemsToOrder(activeOrder.id, items, cartTotal);
       } else {
-        await _service.placeOrder(tableId, items, cartTotal);
+        await _service.placeOrder(tableId, items, cartTotal, customerInfo: customerInfo);
       }
       
       clearCart();
@@ -172,14 +180,17 @@ class RestaurantProvider with ChangeNotifier {
   Future<String> exportSalesToCSV(List<OrderModel> orders) async {
     List<List<dynamic>> rows = [];
     // Header
-    rows.add(["Date", "Table", "Total Items", "Total Amount", "Status"]);
+    rows.add(["Bill No", "Date", "Table", "Total Items", "Discount", "Total Amount", "Payment Method", "Status"]);
 
     for (var order in orders) {
       rows.add([
+        order.billNo != null ? 'REG-${order.billNo.toString().padLeft(4, '0')}' : 'N/A',
         DateFormat('yyyy-MM-dd HH:mm').format(order.createdAt),
         order.tableName,
         order.items.fold(0, (sum, item) => (sum as int) + item.quantity),
-        order.totalAmount,
+        order.discountAmount,
+        order.finalAmount,
+        order.paymentMethod ?? 'N/A',
         order.status,
       ]);
     }
@@ -193,6 +204,17 @@ class RestaurantProvider with ChangeNotifier {
     await file.writeAsString(csvData);
     
     return path;
+  }
+
+  Future<void> updateOrderPaymentMethod(String orderId, String paymentMethod) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _service.updateOrderPaymentMethod(orderId, paymentMethod);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   // --- Menu Management Actions ---

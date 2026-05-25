@@ -105,13 +105,14 @@ class SupabaseService {
   }
 
   // Place Order
-  Future<void> placeOrder(String tableId, List<Map<String, dynamic>> items, double total) async {
+  Future<void> placeOrder(String tableId, List<Map<String, dynamic>> items, double total, {String? customerInfo}) async {
     // 1. Create Order
     final orderResponse = await client.from('orders').insert({
       'table_id': tableId,
       'total_amount': total,
       'status': 'pending',
       'order_source': 'waiter',
+      'customer_info': customerInfo,
     }).select().single();
 
     final orderId = orderResponse['id'];
@@ -137,6 +138,33 @@ class SupabaseService {
       updates['completed_at'] = DateTime.now().toIso8601String();
       if (paymentMethod != null) {
         updates['payment_method'] = paymentMethod;
+      }
+
+      // Generate and save bill_no if not already set
+      try {
+        final currentOrder = await client.from('orders').select('bill_no').eq('id', orderId).single();
+        if (currentOrder['bill_no'] == null) {
+          final response = await client
+              .from('orders')
+              .select('bill_no')
+              .order('bill_no', ascending: false)
+              .limit(1)
+              .maybeSingle();
+
+          int lastBillNo = 0;
+          if (response != null && response['bill_no'] != null) {
+            lastBillNo = response['bill_no'] as int;
+          } else {
+            final countResponse = await client
+                .from('orders')
+                .select('id')
+                .eq('status', 'paid');
+            lastBillNo = (countResponse as List).length;
+          }
+          updates['bill_no'] = lastBillNo + 1;
+        }
+      } catch (e) {
+        print("Error generating bill_no during status update: $e");
       }
     }
     
@@ -167,20 +195,66 @@ class SupabaseService {
     final orderData = await client.from('orders').select('total_amount').eq('id', orderId).single();
     final double currentTotal = (orderData['total_amount'] as num).toDouble();
 
-    // 2. Insert new items
-    final orderItems = items.map((item) => {
-      'order_id': orderId,
-      'menu_item_id': item['menu_item_id'],
-      'quantity': item['quantity'],
-      'price': item['price'],
+    // 2. Fetch existing items for this order
+    final existingItemsResponse = await client.from('order_items').select().eq('order_id', orderId);
+    final List<Map<String, dynamic>> existingItems = List<Map<String, dynamic>>.from(existingItemsResponse);
+
+    // 3. Merge incoming items with existing ones
+    List<Map<String, dynamic>> mergedItems = [...existingItems];
+
+    for (var newItem in items) {
+      int existingIndex = mergedItems.indexWhere((item) => item['menu_item_id'] == newItem['menu_item_id']);
+      if (existingIndex >= 0) {
+        mergedItems[existingIndex] = {
+          ...mergedItems[existingIndex],
+          'quantity': (mergedItems[existingIndex]['quantity'] as num).toInt() + (newItem['quantity'] as num).toInt(),
+          'printed_quantity': mergedItems[existingIndex]['printed_quantity'] ?? 0,
+        };
+      } else {
+        mergedItems.add({
+          'order_id': orderId,
+          'menu_item_id': newItem['menu_item_id'],
+          'quantity': (newItem['quantity'] as num).toInt(),
+          'printed_quantity': 0,
+          'price': (newItem['price'] as num).toDouble(),
+        });
+      }
+    }
+
+    // 4. Update the order_items table (delete old, insert new)
+    await client.from('order_items').delete().eq('order_id', orderId);
+    
+    final itemsToInsert = mergedItems.map((item) {
+       return {
+          'order_id': orderId,
+          'menu_item_id': item['menu_item_id'],
+          'quantity': item['quantity'],
+          'printed_quantity': item['printed_quantity'] ?? 0,
+          'price': item['price'],
+       };
     }).toList();
+    
+    await client.from('order_items').insert(itemsToInsert);
 
-    await client.from('order_items').insert(orderItems);
-
-    // 3. Update Order Total
+    // 5. Update Order Total
     await client.from('orders').update({
       'total_amount': currentTotal + additionalTotal,
     }).eq('id', orderId);
+  }
+
+  Future<void> markOrderAsPrinted(String orderId) async {
+    // 1. Fetch current items
+    final response = await client.from('order_items').select().eq('order_id', orderId);
+    final items = List<Map<String, dynamic>>.from(response);
+
+    // 2. Set printed_quantity = quantity
+    for (var item in items) {
+      if (item['quantity'] != item['printed_quantity']) {
+        await client.from('order_items').update({
+          'printed_quantity': item['quantity'],
+        }).eq('id', item['id']);
+      }
+    }
   }
 
   Future<void> placeParcelOrder(List<Map<String, dynamic>> items, double total, String? customerInfo) async {
@@ -236,15 +310,33 @@ class SupabaseService {
 
   // --- Table Management ---
 
-  Future<void> addTable(String name) async {
+  Future<String> addTable(String name) async {
     final response = await client.from('tables').select().eq('name', name).maybeSingle();
     if (response != null) {
       throw Exception('Table with name "$name" already exists!');
     }
-    await client.from('tables').insert({
+    final insertResponse = await client.from('tables').insert({
       'name': name,
       'status': 'available',
-    });
+    }).select('id').single();
+    return insertResponse['id'] as String;
+  }
+
+  Future<void> transferOrder(String orderId, String sourceTableId, String targetTableId) async {
+    // 1. Update order table id
+    await client.from('orders').update({
+      'table_id': targetTableId,
+    }).eq('id', orderId);
+
+    // 2. Mark destination table occupied
+    await client.from('tables').update({
+      'status': 'occupied',
+    }).eq('id', targetTableId);
+
+    // 3. Mark source table available
+    await client.from('tables').update({
+      'status': 'available',
+    }).eq('id', sourceTableId);
   }
 
   Future<void> updateTable(String id, String name) async {
@@ -273,4 +365,11 @@ class SupabaseService {
       'discount': discount,
     }).eq('id', orderId);
   }
+
+  Future<void> updateOrderPaymentMethod(String orderId, String paymentMethod) async {
+    await client.from('orders').update({
+      'payment_method': paymentMethod,
+    }).eq('id', orderId);
+  }
 }
+

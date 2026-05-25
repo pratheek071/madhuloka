@@ -5,8 +5,9 @@ import '../../models/table_model.dart';
 
 class CartScreen extends StatelessWidget {
   final RestaurantTable table;
+  final String? customerName;
 
-  const CartScreen({super.key, required this.table});
+  const CartScreen({super.key, required this.table, this.customerName});
 
   @override
   Widget build(BuildContext context) {
@@ -29,12 +30,41 @@ class CartScreen extends StatelessWidget {
                 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('₹${item.price} x ${entry.value}'),
-                    trailing: Text(
-                      '₹${(item.price * entry.value).toStringAsFixed(2)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              const SizedBox(height: 4),
+                              Text('₹${(item.price * entry.value).toStringAsFixed(2)}', 
+                                style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.remove_circle_outline, color: Colors.orange),
+                              onPressed: () => provider.removeFromCart(entry.key),
+                            ),
+                            Text('${entry.value}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            IconButton(
+                              icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                              onPressed: () => provider.addToCart(entry.key),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              onPressed: () => provider.deleteFromCart(entry.key),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -70,7 +100,7 @@ class CartScreen extends StatelessWidget {
                       ? null 
                       : () async {
                           try {
-                            await provider.submitOrder(table.id);
+                            await provider.submitOrder(table.id, customerInfo: customerName);
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Order placed successfully!')),

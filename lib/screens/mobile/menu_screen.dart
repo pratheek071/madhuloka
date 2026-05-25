@@ -9,8 +9,9 @@ import 'cart_screen.dart';
 
 class MenuScreen extends StatefulWidget {
   final RestaurantTable table;
+  final String? customerName;
 
-  const MenuScreen({super.key, required this.table});
+  const MenuScreen({super.key, required this.table, this.customerName});
 
   @override
   State<MenuScreen> createState() => _MenuScreenState();
@@ -45,6 +46,36 @@ class _MenuScreenState extends State<MenuScreen> {
                 )
               : Text('Menu - ${widget.table.name}'),
           actions: [
+            if (!_isSearching && widget.table.status == 'occupied')
+              IconButton(
+                icon: const Icon(Icons.swap_horiz),
+                tooltip: 'Transfer Table',
+                onPressed: () async {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const Center(child: CircularProgressIndicator()),
+                  );
+                  try {
+                    final activeOrder = await SupabaseService().getActiveOrderForTable(widget.table.id);
+                    if (!context.mounted) return;
+                    Navigator.pop(context); // Dismiss loading indicator
+                    if (activeOrder == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('No active order found on this table.')),
+                      );
+                      return;
+                    }
+                    _showTransferDialog(context, activeOrder);
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $e')),
+                    );
+                  }
+                },
+              ),
             if (!_isSearching)
               Builder(
                 builder: (context) {
@@ -188,7 +219,7 @@ class _MenuScreenState extends State<MenuScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => CartScreen(table: widget.table),
+                      builder: (context) => CartScreen(table: widget.table, customerName: widget.customerName),
                     ),
                   );
                 },
@@ -244,6 +275,182 @@ class _MenuScreenState extends State<MenuScreen> {
         );
       }
     }
+  }
+
+  void _showTransferDialog(BuildContext context, OrderModel activeOrder) {
+    final provider = Provider.of<RestaurantProvider>(context, listen: false);
+    final availableTables = provider.tables.where((t) => t.status == 'available').toList();
+
+    bool isNewTable = false;
+    RestaurantTable? selectedTable = availableTables.isNotEmpty ? availableTables.first : null;
+    final textController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Transfer Table ${widget.table.name}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Select transfer destination type:'),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Existing Table'),
+                        selected: !isNewTable,
+                        onSelected: (val) {
+                          if (val) {
+                            setState(() => isNewTable = false);
+                          }
+                        },
+                      ),
+                      ChoiceChip(
+                        label: const Text('New Table'),
+                        selected: isNewTable,
+                        onSelected: (val) {
+                          if (val) {
+                            setState(() => isNewTable = true);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (!isNewTable) ...[
+                    const Text('Destination Table:'),
+                    const SizedBox(height: 8),
+                    if (availableTables.isEmpty)
+                      const Text(
+                        'No available tables. Create a new table.',
+                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<RestaurantTable>(
+                            value: selectedTable,
+                            isExpanded: true,
+                            items: availableTables.map((t) {
+                              return DropdownMenuItem<RestaurantTable>(
+                                value: t,
+                                child: Text(t.name),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              setState(() => selectedTable = val);
+                            },
+                          ),
+                        ),
+                      ),
+                  ] else ...[
+                    const Text('New Table Name:'),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: textController,
+                      decoration: const InputDecoration(
+                        hintText: 'e.g. Table 12',
+                        border: OutlineInputBorder(),
+                      ),
+                      textCapitalization: TextCapitalization.words,
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    String? targetTableId;
+                    String targetTableName = '';
+                    
+                    if (isNewTable) {
+                      final name = textController.text.trim();
+                      if (name.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please enter a table name')),
+                        );
+                        return;
+                      }
+                      targetTableName = name;
+                    } else {
+                      if (selectedTable == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please select a destination table')),
+                        );
+                        return;
+                      }
+                      targetTableId = selectedTable!.id;
+                      targetTableName = selectedTable!.name;
+                    }
+
+                    // Show a progress indicator
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => const Center(child: CircularProgressIndicator()),
+                    );
+
+                    try {
+                      if (isNewTable) {
+                        // Create the new table first
+                        targetTableId = await SupabaseService().addTable(targetTableName);
+                      }
+
+                      // Execute the transfer
+                      await SupabaseService().transferOrder(activeOrder.id, widget.table.id, targetTableId!);
+                      
+                      // Refresh the tables lists
+                      await provider.fetchData();
+
+                      if (context.mounted) {
+                        // Pop progress dialog
+                        Navigator.pop(context);
+                        // Pop transfer dialog
+                        Navigator.pop(dialogContext);
+                        // Pop MenuScreen since the table is no longer occupied / order transferred!
+                        Navigator.pop(context);
+                        
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Order transferred to $targetTableName successfully!')),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        // Pop progress dialog
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error transferring order: $e')),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepOrange,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Transfer'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildOrderedItemsTab() {

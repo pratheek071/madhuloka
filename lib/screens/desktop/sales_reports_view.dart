@@ -12,48 +12,80 @@ class SalesReportsView extends StatefulWidget {
   State<SalesReportsView> createState() => _SalesReportsViewState();
 }
 
-class _SalesReportsViewState extends State<SalesReportsView> {
+class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepAliveClientMixin {
   DateTimeRange _selectedRange = DateTimeRange(
     start: DateTime.now().copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0),
     end: DateTime.now().copyWith(hour: 23, minute: 59, second: 59, millisecond: 999, microsecond: 999),
   );
+  String _paymentFilter = 'All';
+  late Future<List<OrderModel>> _ordersFuture;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchOrders();
+  }
+
+  void _fetchOrders() {
+    _ordersFuture = context.read<RestaurantProvider>().getCompletedOrders(
+      start: _selectedRange.start,
+      end: _selectedRange.end,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(32.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with Filter
-          _buildHeader(context),
-          const SizedBox(height: 16),
-          _buildQuickFilters(context),
-          const SizedBox(height: 32),
-          
-          // Summary Cards
-          _buildSummaryCards(context),
-          const SizedBox(height: 32),
-          
-          // Table and Item Breakdown
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 2, child: _buildSalesTable(context)),
-                const SizedBox(width: 32),
-                Expanded(child: _buildItemBreakdown(context)),
-              ],
-            ),
+    super.build(context);
+    return FutureBuilder<List<OrderModel>>(
+      future: _ordersFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final allOrders = snapshot.data ?? [];
+        final filteredOrders = allOrders.where((order) {
+          if (_paymentFilter == 'All') return true;
+          return order.paymentMethod?.toLowerCase() == _paymentFilter.toLowerCase();
+        }).toList();
+
+        return Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with Filter
+              _buildHeader(context),
+              const SizedBox(height: 16),
+              _buildQuickFilters(context),
+              const SizedBox(height: 32),
+              
+              // Summary Cards
+              _buildSummaryCards(filteredOrders),
+              const SizedBox(height: 32),
+              
+              // Table and Item Breakdown
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 2, child: _buildSalesTable(filteredOrders)),
+                    const SizedBox(width: 32),
+                    Expanded(child: _buildItemBreakdown(filteredOrders)),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildHeader(BuildContext context) {
-    final provider = context.read<RestaurantProvider>();
-    
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -76,6 +108,36 @@ class _SalesReportsViewState extends State<SalesReportsView> {
         ),
         Row(
           children: [
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment<String>(
+                  value: 'All',
+                  icon: Icon(Icons.all_inclusive, size: 16),
+                  label: Text('All'),
+                ),
+                ButtonSegment<String>(
+                  value: 'Cash',
+                  icon: Icon(Icons.money, size: 16),
+                  label: Text('Cash'),
+                ),
+                ButtonSegment<String>(
+                  value: 'Online',
+                  icon: Icon(Icons.payment, size: 16),
+                  label: Text('Online'),
+                ),
+              ],
+              selected: {_paymentFilter},
+              onSelectionChanged: (newSelection) {
+                setState(() {
+                  _paymentFilter = newSelection.first;
+                });
+              },
+              style: SegmentedButton.styleFrom(
+                selectedBackgroundColor: Colors.deepOrange,
+                selectedForegroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 16),
             OutlinedButton.icon(
               onPressed: _selectDateRange,
               icon: const Icon(Icons.date_range),
@@ -91,6 +153,17 @@ class _SalesReportsViewState extends State<SalesReportsView> {
               label: const Text('Export to CSV'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              ),
+            ),
+            const SizedBox(width: 16),
+            ElevatedButton.icon(
+              onPressed: () => _exportReportPDF(context),
+              icon: const Icon(Icons.picture_as_pdf),
+              label: const Text('Export to PDF'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade700,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               ),
@@ -171,245 +244,353 @@ class _SalesReportsViewState extends State<SalesReportsView> {
   void _updateRange(DateTime start, DateTime end) {
     setState(() {
       _selectedRange = DateTimeRange(start: start, end: end);
+      _fetchOrders();
     });
   }
 
-  Widget _buildSummaryCards(BuildContext context) {
-    return FutureBuilder<List<OrderModel>>(
-      future: context.read<RestaurantProvider>().getCompletedOrders(
-        start: _selectedRange.start,
-        end: _selectedRange.end,
-      ),
-      builder: (context, snapshot) {
-        final orders = snapshot.data ?? [];
-        final totalRevenue = orders.fold(0.0, (sum, o) => sum + o.totalAmount);
-        final totalOrders = orders.length;
+  Widget _buildSummaryCards(List<OrderModel> orders) {
+    final totalRevenue = orders.fold(0.0, (sum, o) => sum + o.finalAmount);
+    final totalOrders = orders.length;
+    final totalItems = orders.fold(0, (sum, o) => sum + o.items.fold(0, (isum, i) => isum + i.quantity));
+    final averageOrder = totalOrders > 0 ? (totalRevenue / totalOrders) : 0.0;
 
-        return Row(
-          children: [
-            _SummaryCard(
-              title: 'Total Revenue',
-              value: '₹${totalRevenue.toStringAsFixed(2)}',
-              icon: Icons.account_balance_wallet,
-              color: Colors.deepOrange,
-            ),
-            const SizedBox(width: 24),
-            _SummaryCard(
-              title: 'Total Orders',
-              value: totalOrders.toString(),
-              icon: Icons.receipt_long,
-              color: Colors.blue,
-            ),
-            const SizedBox(width: 24),
-            _SummaryCard(
-              title: 'Items Sold',
-              value: orders.fold(0, (sum, o) => sum + o.items.fold(0, (isum, i) => isum + i.quantity)).toString(),
-              icon: Icons.inventory_2,
-              color: Colors.teal,
-            ),
-            const SizedBox(width: 24),
-            _SummaryCard(
-              title: 'Average Order',
-              value: totalOrders > 0 ? '₹${(totalRevenue / totalOrders).toStringAsFixed(2)}' : '₹0.00',
-              icon: Icons.analytics,
-              color: Colors.purple,
-            ),
-          ],
-        );
-      },
+    // Discount Analytics
+    final totalDiscounts = orders.fold(0.0, (sum, o) => sum + o.discountAmount);
+    final discountedOrdersCount = orders.where((o) => o.discount > 0).length;
+    final avgDiscountPercent = discountedOrdersCount > 0 
+        ? orders.where((o) => o.discount > 0).fold(0.0, (sum, o) => sum + o.discount) / discountedOrdersCount
+        : 0.0;
+
+    return Row(
+      children: [
+        _SummaryCard(
+          title: 'Total Revenue',
+          value: '₹${totalRevenue.toStringAsFixed(2)}',
+          icon: Icons.account_balance_wallet,
+          color: Colors.deepOrange,
+        ),
+        const SizedBox(width: 16),
+        _SummaryCard(
+          title: 'Total Orders',
+          value: totalOrders.toString(),
+          icon: Icons.receipt_long,
+          color: Colors.blue,
+        ),
+        const SizedBox(width: 16),
+        _SummaryCard(
+          title: 'Discounts Given',
+          value: '₹${totalDiscounts.toStringAsFixed(2)}',
+          icon: Icons.percent,
+          color: Colors.purple,
+          subtitle: '${discountedOrdersCount} orders • ${avgDiscountPercent.toStringAsFixed(1)}% avg',
+        ),
+        const SizedBox(width: 16),
+        _SummaryCard(
+          title: 'Items Sold',
+          value: totalItems.toString(),
+          icon: Icons.inventory_2,
+          color: Colors.teal,
+        ),
+        const SizedBox(width: 16),
+        _SummaryCard(
+          title: 'Average Order',
+          value: '₹${averageOrder.toStringAsFixed(2)}',
+          icon: Icons.analytics,
+          color: Colors.indigo,
+        ),
+      ],
     );
   }
 
-  Widget _buildSalesTable(BuildContext context) {
-    return FutureBuilder<List<OrderModel>>(
-      future: context.read<RestaurantProvider>().getCompletedOrders(
-        start: _selectedRange.start,
-        end: _selectedRange.end,
+  Widget _buildSalesTable(List<OrderModel> orders) {
+    if (orders.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 64, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            const Text('No sales found for this period.', style: TextStyle(color: Colors.grey, fontSize: 18)),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
       ),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SingleChildScrollView(
+          child: DataTable(
+            headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
+            columnSpacing: 24,
+            columns: const [
+              DataColumn(label: Text('BILL NO', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('TIME', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('TABLE / INFO', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('SOURCE', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('ITEMS', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('DISCOUNT', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('AMOUNT', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('PAYMENT', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('DETAILS', style: TextStyle(fontWeight: FontWeight.bold))),
+            ],
+            rows: orders.asMap().entries.map((entry) {
+              final index = entry.key;
+              final order = entry.value;
+              final isEven = index % 2 == 0;
 
-        final orders = snapshot.data ?? [];
-        if (orders.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.search_off, size: 64, color: Colors.grey.shade300),
-                const SizedBox(height: 16),
-                const Text('No sales found for this period.', style: TextStyle(color: Colors.grey, fontSize: 18)),
-              ],
-            ),
-          );
-        }
+              return DataRow(
+                color: WidgetStateProperty.all(isEven ? Colors.white : Colors.grey.shade50),
+                cells: [
+                  DataCell(Text(order.billNo != null 
+                    ? 'REG-${order.billNo.toString().padLeft(4, '0')}' 
+                    : 'N/A', 
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey))),
+                  DataCell(Text(DateFormat('HH:mm, dd MMM').format(order.completedAt ?? order.createdAt))),
+                  DataCell(Text(order.isParcel 
+                    ? 'Parcel: ${order.customerInfo ?? "N/A"}' 
+                    : (order.tableName ?? 'Table'))),
+                  DataCell(_SourceBadge(source: order.orderSource)),
+                  DataCell(Text('${order.items.length} items')),
+                  DataCell(Text('₹${order.discountAmount.toStringAsFixed(2)}', 
+                    style: const TextStyle(color: Colors.red))),
+                  DataCell(Text('₹${order.finalAmount.toStringAsFixed(2)}', 
+                    style: const TextStyle(fontWeight: FontWeight.bold))),
+                  DataCell(
+                    PopupMenuButton<String>(
+                      tooltip: 'Change Payment Method',
+                      onSelected: (String newMethod) async {
+                        if (order.paymentMethod?.toLowerCase() != newMethod.toLowerCase()) {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Change Payment Method'),
+                              content: Text(
+                                'Are you sure you want to change the payment method of bill '
+                                '${order.billNo != null ? "REG-${order.billNo.toString().padLeft(4, '0')}" : "N/A"} '
+                                'from ${order.paymentMethod ?? "PAID"} to ${newMethod.toUpperCase()}?'
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.deepOrange,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  child: const Text('Confirm'),
+                                ),
+                              ],
+                            ),
+                          );
 
-        return Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: SingleChildScrollView(
-              child: DataTable(
-                headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
-                columnSpacing: 24,
-                columns: const [
-                  DataColumn(label: Text('BILL NO', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text('TIME', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text('TABLE / INFO', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text('SOURCE', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text('ITEMS', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text('AMOUNT', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text('PAYMENT', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text('DETAILS', style: TextStyle(fontWeight: FontWeight.bold))),
-                ],
-                rows: orders.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final order = entry.value;
-                  final isEven = index % 2 == 0;
+                          if (confirm == true && mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Updating payment method...')),
+                            );
+                            try {
+                              await context.read<RestaurantProvider>().updateOrderPaymentMethod(order.id, newMethod);
+                              
+                              if (!mounted) return;
+                              _fetchOrders();
+                              setState(() {});
 
-                  return DataRow(
-                    color: WidgetStateProperty.all(isEven ? Colors.white : Colors.grey.shade50),
-                    cells: [
-                      DataCell(Text(order.billNo != null 
-                        ? 'REG-${order.billNo.toString().padLeft(4, '0')}' 
-                        : 'N/A', 
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey))),
-                      DataCell(Text(DateFormat('HH:mm, dd MMM').format(order.completedAt ?? order.createdAt))),
-                      DataCell(Text(order.isParcel 
-                        ? 'Parcel: ${order.customerInfo ?? "N/A"}' 
-                        : (order.tableName ?? 'Table'))),
-                      DataCell(_SourceBadge(source: order.orderSource)),
-                      DataCell(Text('${order.items.length} items')),
-                      DataCell(Text('₹${order.totalAmount.toStringAsFixed(2)}', 
-                        style: const TextStyle(fontWeight: FontWeight.bold))),
-                      DataCell(Container(
+                              ScaffoldMessenger.of(context).clearSnackBars();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Payment method updated successfully!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            } catch (e) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).clearSnackBars();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Failed to update payment method: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      },
+                      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                        const PopupMenuItem<String>(
+                          value: 'cash',
+                          child: Row(
+                            children: [
+                              Icon(Icons.money, color: Colors.green, size: 18),
+                              SizedBox(width: 8),
+                              Text('Cash'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem<String>(
+                          value: 'online',
+                          child: Row(
+                            children: [
+                              Icon(Icons.payment, color: Colors.blue, size: 18),
+                              SizedBox(width: 8),
+                              Text('Online'),
+                            ],
+                          ),
+                        ),
+                      ],
+                      child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: (order.paymentMethod?.toLowerCase() == 'online') ? Colors.blue.shade50 : Colors.green.shade50,
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade300, width: 0.5),
                         ),
-                        child: Text(
-                          (order.paymentMethod ?? 'PAID').toUpperCase(), 
-                          style: TextStyle(
-                            color: (order.paymentMethod?.toLowerCase() == 'online') ? Colors.blue.shade700 : Colors.green.shade700, 
-                            fontSize: 12, 
-                            fontWeight: FontWeight.bold
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              (order.paymentMethod ?? 'PAID').toUpperCase(), 
+                              style: TextStyle(
+                                color: (order.paymentMethod?.toLowerCase() == 'online') ? Colors.blue.shade700 : Colors.green.shade700, 
+                                fontSize: 12, 
+                                fontWeight: FontWeight.bold
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.arrow_drop_down,
+                              size: 14,
+                              color: (order.paymentMethod?.toLowerCase() == 'online') ? Colors.blue.shade700 : Colors.green.shade700,
+                            ),
+                          ],
                         ),
-                      )),
-                      DataCell(IconButton(
-                        icon: const Icon(Icons.visibility, color: Colors.deepOrange),
-                        onPressed: () => _showOrderDetailsDialog(context, order),
-                      )),
-                    ],
-                  );
-                }).toList(),
-              ),
-            ),
+                      ),
+                    ),
+                  ),
+                  DataCell(IconButton(
+                    icon: const Icon(Icons.visibility, color: Colors.deepOrange),
+                    onPressed: () => _showOrderDetailsDialog(context, order),
+                  )),
+                ],
+              );
+            }).toList(),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
-  Widget _buildItemBreakdown(BuildContext context) {
-    return FutureBuilder<List<OrderModel>>(
-      future: context.read<RestaurantProvider>().getCompletedOrders(
-        start: _selectedRange.start,
-        end: _selectedRange.end,
-      ),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return const SizedBox();
-        
-        final orders = snapshot.data ?? [];
-        final Map<String, int> itemCounts = {};
-        
-        for (var order in orders) {
-          for (var item in order.items) {
-            itemCounts[item.itemName] = (itemCounts[item.itemName] ?? 0) + item.quantity;
-          }
-        }
-        
-        final sortedItems = itemCounts.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value));
+  Widget _buildItemBreakdown(List<OrderModel> orders) {
+    final Map<String, int> itemCounts = {};
+    
+    for (var order in orders) {
+      for (var item in order.items) {
+        itemCounts[item.itemName] = (itemCounts[item.itemName] ?? 0) + item.quantity;
+      }
+    }
+    
+    final sortedItems = itemCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
 
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Best Selling Items', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade800)),
-                    ElevatedButton.icon(
-                      onPressed: sortedItems.isEmpty 
-                          ? null 
-                          : () => BillingService.printBestSellingItemsReport(
-                                _selectedRange.start,
-                                _selectedRange.end,
-                                sortedItems,
-                                context: context,
-                              ),
-                      icon: const Icon(Icons.print, size: 16),
-                      label: const Text('Print Report'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.deepOrange,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
-                  ],
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Best Selling Items', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade800)),
+                ElevatedButton.icon(
+                  onPressed: sortedItems.isEmpty 
+                      ? null 
+                      : () => BillingService.printBestSellingItemsReport(
+                            _selectedRange.start,
+                            _selectedRange.end,
+                            sortedItems,
+                            context: context,
+                          ),
+                  icon: const Icon(Icons.print, size: 16),
+                  label: const Text('Print Report'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepOrange,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: sortedItems.isEmpty 
-                  ? const Center(child: Text('No data'))
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(0),
-                      itemCount: sortedItems.length,
-                      separatorBuilder: (context, index) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final item = sortedItems[index];
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.deepOrange.withOpacity(0.1),
-                            child: Text('${index + 1}', style: const TextStyle(color: Colors.deepOrange, fontSize: 12, fontWeight: FontWeight.bold)),
-                          ),
-                          title: Text(item.key, style: const TextStyle(fontWeight: FontWeight.w600)),
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text('${item.value} sold', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          ),
-                        );
-                      },
-                    ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: sortedItems.isEmpty 
+              ? const Center(child: Text('No data'))
+              : ListView.separated(
+                  padding: const EdgeInsets.all(0),
+                  itemCount: sortedItems.length,
+                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final item = sortedItems[index];
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.deepOrange.withOpacity(0.1),
+                        child: Text('${index + 1}', style: const TextStyle(color: Colors.deepOrange, fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                      title: Text(item.key, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      trailing: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text('${item.value} sold', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      ),
+                    );
+                  },
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _safePrint(BuildContext context, Future<void> Function() printFn) async {
+    try {
+      await printFn();
+    } catch (e) {
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Printing Failed'),
+            content: Text('Could not complete printing: $e\n\nPlease ensure your printer is connected, configured, and turned on.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
               ),
             ],
           ),
         );
-      },
-    );
+      }
+    }
   }
 
   void _showOrderDetailsDialog(BuildContext context, OrderModel order) {
@@ -426,10 +607,11 @@ class _SalesReportsViewState extends State<SalesReportsView> {
         ),
         content: SizedBox(
           width: 500,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Divider(),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Divider(),
               ...order.items.map((item) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
@@ -451,26 +633,73 @@ class _SalesReportsViewState extends State<SalesReportsView> {
                 ],
               ),
               const SizedBox(height: 8),
+              if (order.discount > 0) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Subtotal:', style: TextStyle(color: Colors.grey)),
+                    Text('₹${order.totalAmount.toStringAsFixed(2)}', style: const TextStyle(color: Colors.grey)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Discount (${order.discount.toStringAsFixed(0)}%):', style: const TextStyle(color: Colors.red)),
+                    Text('-₹${order.discountAmount.toStringAsFixed(2)}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Total Amount:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  Text('₹${order.totalAmount.toStringAsFixed(2)}', 
+                  Text('₹${order.finalAmount.toStringAsFixed(2)}', 
                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.deepOrange)),
                 ],
               ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
       ),
-    );
-  }
+      actions: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _safePrint(context, () => BillingService.printKotAndBot(order, context: context, forcePrintAll: true)),
+                  icon: const Icon(Icons.receipt_long),
+                  label: const Text('Print KOT & BOT'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.brown,
+                    side: const BorderSide(color: Colors.brown),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () => _safePrint(context, () => BillingService.printInvoice(order, context: context)),
+                  icon: const Icon(Icons.print),
+                  label: const Text('Print Bill'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 
   Future<void> _selectDateRange() async {
     final DateTimeRange? picked = await showDateRangePicker(
@@ -498,6 +727,7 @@ class _SalesReportsViewState extends State<SalesReportsView> {
           start: picked.start.copyWith(hour: 0, minute: 0, second: 0),
           end: picked.end.copyWith(hour: 23, minute: 59, second: 59),
         );
+        _fetchOrders();
       });
     }
   }
@@ -509,10 +739,38 @@ class _SalesReportsViewState extends State<SalesReportsView> {
       end: _selectedRange.end,
     );
     
-    final path = await provider.exportSalesToCSV(orders);
+    final filteredOrders = orders.where((order) {
+      if (_paymentFilter == 'All') return true;
+      return order.paymentMethod?.toLowerCase() == _paymentFilter.toLowerCase();
+    }).toList();
+    
+    final path = await provider.exportSalesToCSV(filteredOrders);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Report exported to: $path')),
+      );
+    }
+  }
+
+  Future<void> _exportReportPDF(BuildContext context) async {
+    final provider = context.read<RestaurantProvider>();
+    final orders = await provider.getCompletedOrders(
+      start: _selectedRange.start,
+      end: _selectedRange.end,
+    );
+    
+    final filteredOrders = orders.where((order) {
+      if (_paymentFilter == 'All') return true;
+      return order.paymentMethod?.toLowerCase() == _paymentFilter.toLowerCase();
+    }).toList();
+    
+    if (context.mounted) {
+      await BillingService.printSalesReport(
+        _selectedRange.start,
+        _selectedRange.end,
+        filteredOrders,
+        _paymentFilter,
+        context: context,
       );
     }
   }
@@ -523,19 +781,21 @@ class _SummaryCard extends StatelessWidget {
   final String value;
   final IconData icon;
   final Color color;
+  final String? subtitle;
 
   const _SummaryCard({
     required this.title,
     required this.value,
     required this.icon,
     required this.color,
+    this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -552,14 +812,21 @@ class _SummaryCard extends StatelessWidget {
               ),
               child: Icon(icon, color: color, size: 24),
             ),
-            const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
-                const SizedBox(height: 4),
-                Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title, style: TextStyle(color: Colors.grey.shade600, fontSize: 13), overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 4),
+                  Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 4),
+                    Text(subtitle!, style: TextStyle(color: Colors.grey.shade500, fontSize: 11), overflow: TextOverflow.ellipsis),
+                  ],
+                ],
+              ),
             ),
           ],
         ),
