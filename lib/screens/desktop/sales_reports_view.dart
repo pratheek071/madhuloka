@@ -19,6 +19,7 @@ class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepA
   );
   String _paymentFilter = 'All';
   late Future<List<OrderModel>> _ordersFuture;
+  TabController? _tabController;
 
   @override
   bool get wantKeepAlive => true;
@@ -27,6 +28,33 @@ class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepA
   void initState() {
     super.initState();
     _fetchOrders();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final newController = DefaultTabController.of(context);
+    if (newController != _tabController) {
+      _tabController?.removeListener(_handleTabSelection);
+      _tabController = newController;
+      _tabController?.addListener(_handleTabSelection);
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController?.removeListener(_handleTabSelection);
+    super.dispose();
+  }
+
+  void _handleTabSelection() {
+    if (_tabController != null && _tabController!.index == 5) {
+      if (!_tabController!.indexIsChanging) {
+        setState(() {
+          _fetchOrders();
+        });
+      }
+    }
   }
 
   void _fetchOrders() {

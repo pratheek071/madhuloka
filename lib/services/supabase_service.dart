@@ -136,7 +136,7 @@ class SupabaseService {
   Future<void> updateOrderStatus(String orderId, String status, {String? tableId, String? paymentMethod}) async {
     final Map<String, dynamic> updates = {'status': status};
     if (status == 'paid') {
-      updates['completed_at'] = DateTime.now().toIso8601String();
+      updates['completed_at'] = DateTime.now().toUtc().toIso8601String();
       if (paymentMethod != null) {
         updates['payment_method'] = paymentMethod;
       }
@@ -313,10 +313,10 @@ class SupabaseService {
         .eq('status', 'paid');
     
     if (start != null) {
-      query = query.gte('completed_at', start.toIso8601String());
+      query = query.gte('completed_at', start.toUtc().toIso8601String());
     }
     if (end != null) {
-      query = query.lte('completed_at', end.toIso8601String());
+      query = query.lte('completed_at', end.toUtc().toIso8601String());
     }
 
     final response = await query.order('completed_at', ascending: false);

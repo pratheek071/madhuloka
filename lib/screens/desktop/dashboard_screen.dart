@@ -81,7 +81,7 @@ class _DesktopDashboardState extends State<DesktopDashboard> {
             const QrCodeView(),
             const MenuManagementView(),
             const DigitalMenuView(),
-            const SalesReportsView(),
+            SalesReportsView(key: ValueKey('SalesReport-$_detailsRefreshCounter')),
           ],
         ),
       ),
@@ -190,11 +190,12 @@ class _DesktopDashboardState extends State<DesktopDashboard> {
                             }
                             return _OrderDetailsView(
                               order: detailedOrder,
-                              onStatusUpdate: () {
-                                setState(() {
-                                  _selectedOrderId = null;
-                                });
-                              },
+                               onStatusUpdate: () {
+                                 setState(() {
+                                   _selectedOrderId = null;
+                                   _detailsRefreshCounter++;
+                                 });
+                               },
                               onRefresh: () {
                                 setState(() {
                                   _detailsRefreshCounter++;

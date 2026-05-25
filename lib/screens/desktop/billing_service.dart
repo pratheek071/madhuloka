@@ -39,7 +39,7 @@ class BillingService {
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.roll80, // 80mm thermal printer width
-        margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        margin: const pw.EdgeInsets.only(left: 10, right: 22, top: 10, bottom: 10),
         build: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -71,7 +71,7 @@ class BillingService {
               // 4-Column Receipt Grid
               pw.Row(
                 children: [
-                  pw.Expanded(flex: 3, child: pw.Text('Item Name', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                  pw.Expanded(flex: 4, child: pw.Text('Item Name', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                   pw.Expanded(flex: 1, child: pw.Text('Qty', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                   pw.Expanded(flex: 2, child: pw.Text('Price', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                   pw.Expanded(flex: 3, child: pw.Text('Total (Inc Tax)', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
@@ -92,7 +92,7 @@ class BillingService {
                   padding: const pw.EdgeInsets.symmetric(vertical: 2),
                   child: pw.Row(
                     children: [
-                      pw.Expanded(flex: 3, child: pw.Text(item.itemName, style: const pw.TextStyle(fontSize: 7.5))),
+                      pw.Expanded(flex: 4, child: pw.Text(item.itemName, style: const pw.TextStyle(fontSize: 7.5))),
                       pw.Expanded(flex: 1, child: pw.Text('${item.quantity}', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5))),
                       pw.Expanded(flex: 2, child: pw.Text(rate.toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 7.5))),
                       pw.Expanded(flex: 3, child: pw.Text(totalLinePrice.toStringAsFixed(2), textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 7.5))),

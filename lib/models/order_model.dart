@@ -64,7 +64,7 @@ class OrderModel {
       'customer_info': customerInfo,
       'order_source': orderSource,
       'payment_method': paymentMethod,
-      'completed_at': completedAt?.toIso8601String(),
+      'completed_at': completedAt?.toUtc().toIso8601String(),
       'bill_no': billNo,
       'discount': discount,
     };
