@@ -207,6 +207,7 @@ class BillingService {
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => pdf.save(),
         name: filename,
+        format: PdfPageFormat.roll80,
       );
     }
   }
@@ -367,6 +368,7 @@ class BillingService {
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => combinedPdf.save(),
         name: filename,
+        format: PdfPageFormat.roll80,
       );
       if (!forcePrintAll) {
         await SupabaseService().markOrderAsPrinted(order.id);
@@ -422,7 +424,7 @@ class BillingService {
                     borderRadius: BorderRadius.circular(12),
                     child: PdfPreview(
                       build: (format) async => pdf.save(),
-                      allowPrinting: false, // Override printing with our custom actions
+                      allowPrinting: true, // Enable standard printing
                       allowSharing: false,
                       canChangePageFormat: false,
                       canChangeOrientation: false,
@@ -487,6 +489,7 @@ class BillingService {
                               await Printing.layoutPdf(
                                 onLayout: (PdfPageFormat format) async => actualPdf.save(),
                                 name: 'Bill_${invoiceOrder.tableName ?? 'Table'}_REG-${billNumber.toString().padLeft(4, '0')}',
+                                format: PdfPageFormat.roll80,
                               );
 
                               if (context.mounted) {
@@ -501,6 +504,7 @@ class BillingService {
                                   await Printing.layoutPdf(
                                     onLayout: (format) async => job.save(),
                                     name: jobName,
+                                    format: PdfPageFormat.roll80,
                                   );
                                 } catch (e) {
                                   debugPrint("KOT/BOT Printing error: $e");
@@ -525,6 +529,7 @@ class BillingService {
                               await Printing.layoutPdf(
                                 onLayout: (PdfPageFormat format) async => pdf.save(),
                                 name: filename,
+                                format: PdfPageFormat.roll80,
                               );
                               if (context.mounted) {
                                 Navigator.of(dialogContext).pop();
