@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -578,13 +580,12 @@ class BillingService {
     _showPrintPreviewDialog(context, pdf, filename);
   }
 
-  static Future<void> printSalesReport(
+  static Future<String> saveSalesReport(
     DateTime start, 
     DateTime end, 
     List<OrderModel> orders, 
-    String paymentFilter, {
-    required BuildContext context,
-  }) async {
+    String paymentFilter,
+  ) async {
     final pdf = pw.Document();
     
     pdf.addPage(
@@ -696,10 +697,23 @@ class BillingService {
       ),
     );
 
-    final String filename = 'Sales_Report_${DateFormat('yyyyMMdd').format(start)}_${DateFormat('yyyyMMdd').format(end)}';
-    if (context.mounted) {
-      _showPrintPreviewDialog(context, pdf, filename);
+    final directory = await getApplicationDocumentsDirectory();
+    final String dateStr = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    final String path = "${directory.path}/sales_report_$dateStr.pdf";
+    final file = File(path);
+    await file.writeAsBytes(await pdf.save());
+
+    try {
+      if (Platform.isWindows) {
+        await Process.run('explorer.exe', [path]);
+      } else if (Platform.isMacOS) {
+        await Process.run('open', [path]);
+      }
+    } catch (e) {
+      debugPrint("Could not automatically open PDF: $e");
     }
+
+    return path;
   }
 
   static pw.Widget _buildPdfSummaryCard(String title, String value, PdfColor color) {

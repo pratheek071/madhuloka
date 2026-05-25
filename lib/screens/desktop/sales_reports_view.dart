@@ -765,13 +765,32 @@ class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepA
     }).toList();
     
     if (context.mounted) {
-      await BillingService.printSalesReport(
-        _selectedRange.start,
-        _selectedRange.end,
-        filteredOrders,
-        _paymentFilter,
-        context: context,
-      );
+      try {
+        final path = await BillingService.saveSalesReport(
+          _selectedRange.start,
+          _selectedRange.end,
+          filteredOrders,
+          _paymentFilter,
+        );
+        
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Report saved and opened: $path'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to save PDF: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 }
