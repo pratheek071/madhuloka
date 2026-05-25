@@ -154,8 +154,8 @@ class _QrCodeViewState extends State<QrCodeView> {
     final qrImage = pw.MemoryImage(qrImageBytes);
 
     final qrPageFormat = PdfPageFormat(
-      80 * PdfPageFormat.mm,
-      110 * PdfPageFormat.mm,
+      79 * PdfPageFormat.mm,
+      79 * PdfPageFormat.mm,
       marginAll: 4 * PdfPageFormat.mm,
     );
 
@@ -194,6 +194,7 @@ class _QrCodeViewState extends State<QrCodeView> {
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
       name: 'QR_Menu_Only',
+      format: qrPageFormat,
     );
   }
 
