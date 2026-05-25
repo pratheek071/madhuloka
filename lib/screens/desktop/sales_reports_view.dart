@@ -748,34 +748,222 @@ class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepA
 }
 
   Future<void> _selectDateRange() async {
-    final DateTimeRange? picked = await showDateRangePicker(
+    final startController = TextEditingController(
+      text: DateFormat('dd/MM/yyyy').format(_selectedRange.start),
+    );
+    final endController = TextEditingController(
+      text: DateFormat('dd/MM/yyyy').format(_selectedRange.end),
+    );
+
+    final formKey = GlobalKey<FormState>();
+
+    DateTime? parseDate(String value) {
+      try {
+        final parts = value.split('/');
+        if (parts.length != 3) return null;
+        final day = int.tryParse(parts[0]);
+        final month = int.tryParse(parts[1]);
+        final year = int.tryParse(parts[2]);
+        if (day == null || month == null || year == null) return null;
+        final date = DateTime(year, month, day);
+        if (date.year != year || date.month != month || date.day != day) return null;
+        return date;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    await showDialog(
       context: context,
-      initialDateRange: _selectedRange,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Colors.deepOrange,
-              onPrimary: Colors.white,
-              onSurface: Colors.black,
-            ),
-          ),
-          child: child!,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E1E1E), // Match Slate dark theme
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text(
+                'Enter Date Range',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.deepOrange.shade100,
+                ),
+              ),
+              content: SizedBox(
+                width: 400,
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Format: DD/MM/YYYY',
+                        style: TextStyle(color: Colors.grey, fontSize: 13),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: startController,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: 'Start Date',
+                                labelStyle: const TextStyle(color: Colors.grey),
+                                border: const OutlineInputBorder(),
+                                enabledBorder: const OutlineInputBorder(
+                                  borderSide: BorderSide(color: Colors.grey),
+                                ),
+                                focusedBorder: const OutlineInputBorder(
+                                  borderSide: BorderSide(color: Colors.deepOrange),
+                                ),
+                                errorStyle: const TextStyle(color: Colors.redAccent),
+                                suffixIcon: IconButton(
+                                  icon: const Icon(Icons.calendar_today, size: 20, color: Colors.deepOrange),
+                                  onPressed: () async {
+                                    final currentVal = parseDate(startController.text) ?? DateTime.now();
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: currentVal,
+                                      firstDate: DateTime(2020),
+                                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                                      builder: (context, child) {
+                                        return Theme(
+                                          data: Theme.of(context).copyWith(
+                                            colorScheme: const ColorScheme.dark(
+                                              primary: Colors.deepOrange,
+                                              onPrimary: Colors.white,
+                                              surface: Color(0xFF1E1E1E),
+                                              onSurface: Colors.white,
+                                            ),
+                                          ),
+                                          child: child!,
+                                        );
+                                      },
+                                    );
+                                    if (picked != null) {
+                                      setDialogState(() {
+                                        startController.text = DateFormat('dd/MM/yyyy').format(picked);
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                              keyboardType: TextInputType.datetime,
+                              validator: (val) {
+                                if (val == null || val.isEmpty) {
+                                  return 'Required';
+                                }
+                                if (parseDate(val) == null) {
+                                  return 'Use DD/MM/YYYY';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: TextFormField(
+                              controller: endController,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: 'End Date',
+                                labelStyle: const TextStyle(color: Colors.grey),
+                                border: const OutlineInputBorder(),
+                                enabledBorder: const OutlineInputBorder(
+                                  borderSide: BorderSide(color: Colors.grey),
+                                ),
+                                focusedBorder: const OutlineInputBorder(
+                                  borderSide: BorderSide(color: Colors.deepOrange),
+                                ),
+                                errorStyle: const TextStyle(color: Colors.redAccent),
+                                suffixIcon: IconButton(
+                                  icon: const Icon(Icons.calendar_today, size: 20, color: Colors.deepOrange),
+                                  onPressed: () async {
+                                    final currentVal = parseDate(endController.text) ?? DateTime.now();
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: currentVal,
+                                      firstDate: DateTime(2020),
+                                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                                      builder: (context, child) {
+                                        return Theme(
+                                          data: Theme.of(context).copyWith(
+                                            colorScheme: const ColorScheme.dark(
+                                              primary: Colors.deepOrange,
+                                              onPrimary: Colors.white,
+                                              surface: Color(0xFF1E1E1E),
+                                              onSurface: Colors.white,
+                                            ),
+                                          ),
+                                          child: child!,
+                                        );
+                                      },
+                                    );
+                                    if (picked != null) {
+                                      setDialogState(() {
+                                        endController.text = DateFormat('dd/MM/yyyy').format(picked);
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                              keyboardType: TextInputType.datetime,
+                              validator: (val) {
+                                if (val == null || val.isEmpty) {
+                                  return 'Required';
+                                }
+                                final endD = parseDate(val);
+                                if (endD == null) {
+                                  return 'Use DD/MM/YYYY';
+                                }
+                                final startD = parseDate(startController.text);
+                                if (startD != null && endD.isBefore(startD)) {
+                                  return 'End before Start';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepOrange,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () {
+                    if (formKey.currentState!.validate()) {
+                      final startD = parseDate(startController.text)!;
+                      final endD = parseDate(endController.text)!;
+                      setState(() {
+                        _selectedRange = DateTimeRange(
+                          start: startD.copyWith(hour: 0, minute: 0, second: 0),
+                          end: endD.copyWith(hour: 23, minute: 59, second: 59),
+                        );
+                        _fetchOrders();
+                      });
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: const Text('Apply'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
-
-    if (picked != null && picked != _selectedRange) {
-      setState(() {
-        _selectedRange = DateTimeRange(
-          start: picked.start.copyWith(hour: 0, minute: 0, second: 0),
-          end: picked.end.copyWith(hour: 23, minute: 59, second: 59),
-        );
-        _fetchOrders();
-      });
-    }
   }
 
   Future<void> _exportReport(BuildContext context) async {
