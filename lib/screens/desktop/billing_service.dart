@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle, ByteData;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -14,7 +15,17 @@ import '../../providers/restaurant_provider.dart';
 
 
 class BillingService {
-  static pw.Document _generateInvoicePdf(OrderModel order, int? billNumber, {List<OrderItem>? customItems}) {
+  static Future<pw.MemoryImage?> _loadLogoImage() async {
+    try {
+      final ByteData data = await rootBundle.load('assets/printlogo.jpeg');
+      return pw.MemoryImage(data.buffer.asUint8List());
+    } catch (e) {
+      debugPrint("Error loading print logo: $e");
+      return null;
+    }
+  }
+
+  static pw.Document _generateInvoicePdf(OrderModel order, int? billNumber, {List<OrderItem>? customItems, pw.MemoryImage? logoImage}) {
     final pdf = pw.Document();
     final items = customItems ?? order.items;
 
@@ -44,6 +55,15 @@ class BillingService {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
+              if (logoImage != null)
+                pw.Center(
+                  child: pw.Container(
+                    margin: const pw.EdgeInsets.only(bottom: 6),
+                    height: 50,
+                    width: 50,
+                    child: pw.Image(logoImage),
+                  ),
+                ),
               // Full Customer Receipt Business Header
               pw.Center(
                 child: pw.Text('MADHULOKA DINING', 
@@ -74,7 +94,7 @@ class BillingService {
                   pw.Expanded(flex: 4, child: pw.Text('Item Name', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                   pw.Expanded(flex: 1, child: pw.Text('Qty', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                   pw.Expanded(flex: 2, child: pw.Text('Price', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-                  pw.Expanded(flex: 3, child: pw.Text('Total (Inc Tax)', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                  pw.Expanded(flex: 3, child: pw.Text('Total Price(incl 5% tax)', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                 ],
               ),
               pw.Divider(thickness: 0.5, color: PdfColors.grey400, height: 8),
@@ -186,7 +206,8 @@ class BillingService {
       }
     }
 
-    final pdf = _generateInvoicePdf(order, billNumber, customItems: customItems);
+    final logoImage = await _loadLogoImage();
+    final pdf = _generateInvoicePdf(order, billNumber, customItems: customItems, logoImage: logoImage);
 
     final String billNoString = billNumber != null 
         ? 'REG-${billNumber.toString().padLeft(4, '0')}' 
@@ -556,10 +577,12 @@ class BillingService {
                           billNumber = (invoiceOrder.createdAt.millisecondsSinceEpoch ~/ 1000) % 10000;
                         }
 
+                        final logoImage = await _loadLogoImage();
                         final actualPdf = _generateInvoicePdf(
                           invoiceOrder, 
                           billNumber, 
                           customItems: customItems,
+                          logoImage: logoImage,
                         );
 
                         await Printing.layoutPdf(
