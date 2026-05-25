@@ -376,22 +376,62 @@ class BillingService {
       );
     } else {
       final jobs = printJobs.isNotEmpty ? printJobs : [combinedPdf];
-      for (int i = 0; i < jobs.length; i++) {
-        final job = jobs[i];
-        final jobName = '${filename}_part$i';
-        try {
-          await Printing.layoutPdf(
-            onLayout: (format) async => job.save(),
-            name: jobName,
-            format: PdfPageFormat.roll80,
+      
+      Printer? targetPrinter;
+      try {
+        final printers = await Printing.listPrinters();
+        if (printers.isNotEmpty) {
+          targetPrinter = printers.firstWhere(
+            (p) => p.isDefault,
+            orElse: () => printers.first,
           );
-        } catch (e) {
-          debugPrint("KOT/BOT Printing error: $e");
         }
-        if (i < jobs.length - 1) {
-          await Future.delayed(const Duration(milliseconds: 1000));
+      } catch (e) {
+        debugPrint("Error listing printers: $e");
+      }
+
+      if (targetPrinter != null) {
+        for (int i = 0; i < jobs.length; i++) {
+          final job = jobs[i];
+          final jobName = '${filename}_part$i';
+          try {
+            await Printing.directPrintPdf(
+              printer: targetPrinter,
+              onLayout: (format) async => job.save(),
+              format: PdfPageFormat.roll80,
+            );
+          } catch (e) {
+            debugPrint("Direct KOT/BOT Printing error: $e");
+            // Fallback
+            await Printing.layoutPdf(
+              onLayout: (format) async => job.save(),
+              name: jobName,
+              format: PdfPageFormat.roll80,
+            );
+          }
+          if (i < jobs.length - 1) {
+            await Future.delayed(const Duration(milliseconds: 1000));
+          }
+        }
+      } else {
+        for (int i = 0; i < jobs.length; i++) {
+          final job = jobs[i];
+          final jobName = '${filename}_part$i';
+          try {
+            await Printing.layoutPdf(
+              onLayout: (format) async => job.save(),
+              name: jobName,
+              format: PdfPageFormat.roll80,
+            );
+          } catch (e) {
+            debugPrint("KOT/BOT Printing error: $e");
+          }
+          if (i < jobs.length - 1) {
+            await Future.delayed(const Duration(milliseconds: 1000));
+          }
         }
       }
+
       if (!forcePrintAll) {
         await SupabaseService().markOrderAsPrinted(order.id);
         if (onPrintComplete != null) {
@@ -533,22 +573,61 @@ class BillingService {
                           context.read<RestaurantProvider>().fetchData();
                         }
                       } else if (separateJobs != null) {
-                        for (int i = 0; i < separateJobs.length; i++) {
-                          final job = separateJobs[i];
-                          final jobName = '${filename}_part$i';
-                          try {
-                            await Printing.layoutPdf(
-                              onLayout: (format) async => job.save(),
-                              name: jobName,
-                              format: PdfPageFormat.roll80,
+                        Printer? targetPrinter;
+                        try {
+                          final printers = await Printing.listPrinters();
+                          if (printers.isNotEmpty) {
+                            targetPrinter = printers.firstWhere(
+                              (p) => p.isDefault,
+                              orElse: () => printers.first,
                             );
-                          } catch (e) {
-                            debugPrint("KOT/BOT Printing error: $e");
                           }
-                          if (i < separateJobs.length - 1) {
-                            await Future.delayed(const Duration(milliseconds: 1000));
+                        } catch (e) {
+                          debugPrint("Error listing printers: $e");
+                        }
+
+                        if (targetPrinter != null) {
+                          for (int i = 0; i < separateJobs.length; i++) {
+                            final job = separateJobs[i];
+                            final jobName = '${filename}_part$i';
+                            try {
+                              await Printing.directPrintPdf(
+                                printer: targetPrinter,
+                                onLayout: (format) async => job.save(),
+                                format: PdfPageFormat.roll80,
+                              );
+                            } catch (e) {
+                              debugPrint("Direct KOT/BOT Printing error: $e");
+                              // Fallback
+                              await Printing.layoutPdf(
+                                onLayout: (format) async => job.save(),
+                                name: jobName,
+                                format: PdfPageFormat.roll80,
+                              );
+                            }
+                            if (i < separateJobs.length - 1) {
+                              await Future.delayed(const Duration(milliseconds: 1000));
+                            }
+                          }
+                        } else {
+                          for (int i = 0; i < separateJobs.length; i++) {
+                            final job = separateJobs[i];
+                            final jobName = '${filename}_part$i';
+                            try {
+                              await Printing.layoutPdf(
+                                onLayout: (format) async => job.save(),
+                                name: jobName,
+                                format: PdfPageFormat.roll80,
+                              );
+                            } catch (e) {
+                              debugPrint("KOT/BOT Printing error: $e");
+                            }
+                            if (i < separateJobs.length - 1) {
+                              await Future.delayed(const Duration(milliseconds: 1000));
+                            }
                           }
                         }
+
                         if (orderToMark != null) {
                           await SupabaseService().markOrderAsPrinted(orderToMark.id);
                           if (onPrintComplete != null) {
