@@ -7,6 +7,7 @@ class OrderItem {
   final int printedQuantity;
   final double price;
   final String itemType;
+  final String? instructions;
 
   OrderItem({
     required this.id,
@@ -17,6 +18,7 @@ class OrderItem {
     this.printedQuantity = 0,
     required this.price,
     this.itemType = 'food',
+    this.instructions,
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,7 @@ class OrderItem {
       printedQuantity: json['printed_quantity'] ?? 0,
       price: (json['price'] as num).toDouble(),
       itemType: json['menu_items']?['item_type'] ?? 'food',
+      instructions: json['instructions'],
     );
   }
 
@@ -39,6 +42,7 @@ class OrderItem {
       'quantity': quantity,
       'printed_quantity': printedQuantity,
       'price': price,
+      'instructions': instructions,
     };
   }
 }

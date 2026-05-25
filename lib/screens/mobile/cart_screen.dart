@@ -3,11 +3,33 @@ import 'package:provider/provider.dart';
 import '../../providers/restaurant_provider.dart';
 import '../../models/table_model.dart';
 
-class CartScreen extends StatelessWidget {
+class CartScreen extends StatefulWidget {
   final RestaurantTable table;
   final String? customerName;
 
   const CartScreen({super.key, required this.table, this.customerName});
+
+  @override
+  State<CartScreen> createState() => _CartScreenState();
+}
+
+class _CartScreenState extends State<CartScreen> {
+  final Map<String, TextEditingController> _controllers = {};
+
+  @override
+  void dispose() {
+    for (var controller in _controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  TextEditingController _getController(String itemId, String initialText) {
+    if (!_controllers.containsKey(itemId)) {
+      _controllers[itemId] = TextEditingController(text: initialText);
+    }
+    return _controllers[itemId]!;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +38,7 @@ class CartScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Review Order - ${table.name}'),
+        title: Text('Review Order - ${widget.table.name}'),
       ),
       body: Column(
         children: [
@@ -32,37 +54,60 @@ class CartScreen extends StatelessWidget {
                   margin: const EdgeInsets.only(bottom: 12),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              const SizedBox(height: 4),
-                              Text('₹${(item.price * entry.value).toStringAsFixed(2)}', 
-                                style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w600)),
-                            ],
-                          ),
-                        ),
                         Row(
-                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove_circle_outline, color: Colors.orange),
-                              onPressed: () => provider.removeFromCart(entry.key),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                  const SizedBox(height: 4),
+                                  Text('₹${(item.price * entry.value).toStringAsFixed(2)}', 
+                                    style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
                             ),
-                            Text('${entry.value}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            IconButton(
-                              icon: const Icon(Icons.add_circle_outline, color: Colors.green),
-                              onPressed: () => provider.addToCart(entry.key),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
-                              onPressed: () => provider.deleteFromCart(entry.key),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline, color: Colors.orange),
+                                  onPressed: () => provider.removeFromCart(entry.key),
+                                ),
+                                Text('${entry.value}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                IconButton(
+                                  icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                                  onPressed: () => provider.addToCart(entry.key),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                  onPressed: () {
+                                    provider.deleteFromCart(entry.key);
+                                    _controllers.remove(entry.key)?.dispose();
+                                  },
+                                ),
+                              ],
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _getController(entry.key, provider.getCartInstruction(entry.key)),
+                          decoration: const InputDecoration(
+                            hintText: 'Add instructions (e.g., no ice, less spicy)',
+                            hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                            border: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+                          ),
+                          style: const TextStyle(fontSize: 13),
+                          onChanged: (val) {
+                            provider.updateCartInstruction(entry.key, val);
+                          },
                         ),
                       ],
                     ),
@@ -100,7 +145,7 @@ class CartScreen extends StatelessWidget {
                       ? null 
                       : () async {
                           try {
-                            await provider.submitOrder(table.id, customerInfo: customerName);
+                            await provider.submitOrder(widget.table.id, customerInfo: widget.customerName);
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Order placed successfully!')),

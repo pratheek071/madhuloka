@@ -246,10 +246,23 @@ class BillingService {
         // Bold/Clear Item list for Kitchen/Bar
         ...items.map((item) => pw.Padding(
           padding: const pw.EdgeInsets.symmetric(vertical: 3),
-          child: pw.Row(
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Expanded(flex: 4, child: pw.Text(item.itemName, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold))),
-              pw.Expanded(child: pw.Text(item.quantity.toString(), textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold))),
+              pw.Row(
+                children: [
+                  pw.Expanded(flex: 4, child: pw.Text(item.itemName, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold))),
+                  pw.Expanded(child: pw.Text(item.quantity.toString(), textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold))),
+                ],
+              ),
+              if (item.instructions != null && item.instructions!.trim().isNotEmpty)
+                pw.Padding(
+                  padding: const pw.EdgeInsets.only(left: 8, top: 1),
+                  child: pw.Text(
+                    'Note: ${item.instructions}',
+                    style: pw.TextStyle(fontSize: 9, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700),
+                  ),
+                ),
             ],
           ),
         )),

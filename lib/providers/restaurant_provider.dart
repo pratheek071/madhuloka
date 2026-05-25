@@ -58,10 +58,20 @@ class RestaurantProvider with ChangeNotifier {
 
   // Cart State (Temporary local state for mobile order taking)
   final Map<String, int> _cart = {}; // menuItemId -> quantity
+  final Map<String, String> _cartInstructions = {}; // menuItemId -> instructions
   bool _isSubmitting = false;
 
   Map<String, int> get cart => _cart;
   bool get isSubmitting => _isSubmitting;
+
+  String getCartInstruction(String itemId) {
+    return _cartInstructions[itemId] ?? '';
+  }
+
+  void updateCartInstruction(String itemId, String instruction) {
+    _cartInstructions[itemId] = instruction;
+    notifyListeners();
+  }
 
   void addToCart(String itemId) {
     print("Adding to cart: $itemId");
@@ -77,6 +87,7 @@ class RestaurantProvider with ChangeNotifier {
         _cart[itemId] = _cart[itemId]! - 1;
       } else {
         _cart.remove(itemId);
+        _cartInstructions.remove(itemId);
       }
       print("New Cart State: $_cart");
       notifyListeners();
@@ -87,6 +98,7 @@ class RestaurantProvider with ChangeNotifier {
     print("Deleting from cart: $itemId");
     if (_cart.containsKey(itemId)) {
       _cart.remove(itemId);
+      _cartInstructions.remove(itemId);
       notifyListeners();
     }
   }
@@ -94,6 +106,7 @@ class RestaurantProvider with ChangeNotifier {
   void clearCart() {
     print("Clearing cart");
     _cart.clear();
+    _cartInstructions.clear();
     notifyListeners();
   }
 
@@ -125,6 +138,7 @@ class RestaurantProvider with ChangeNotifier {
           'menu_item_id': itemId,
           'quantity': qty,
           'price': item.price,
+          'instructions': _cartInstructions[itemId] ?? '',
         });
       });
 
@@ -159,6 +173,7 @@ class RestaurantProvider with ChangeNotifier {
           'menu_item_id': itemId,
           'quantity': qty,
           'price': item.price,
+          'instructions': _cartInstructions[itemId] ?? '',
         });
       });
 

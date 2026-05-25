@@ -123,6 +123,7 @@ class SupabaseService {
       'menu_item_id': item['menu_item_id'],
       'quantity': item['quantity'],
       'price': item['price'],
+      'instructions': item['instructions'] ?? '',
     }).toList();
 
     await client.from('order_items').insert(orderItems);
@@ -205,10 +206,22 @@ class SupabaseService {
     for (var newItem in items) {
       int existingIndex = mergedItems.indexWhere((item) => item['menu_item_id'] == newItem['menu_item_id']);
       if (existingIndex >= 0) {
+        String existingInstructions = mergedItems[existingIndex]['instructions'] ?? '';
+        String newInstructions = newItem['instructions'] ?? '';
+        String finalInstructions = existingInstructions;
+        if (newInstructions.isNotEmpty) {
+          if (finalInstructions.isNotEmpty) {
+            finalInstructions += ", $newInstructions";
+          } else {
+            finalInstructions = newInstructions;
+          }
+        }
+
         mergedItems[existingIndex] = {
           ...mergedItems[existingIndex],
           'quantity': (mergedItems[existingIndex]['quantity'] as num).toInt() + (newItem['quantity'] as num).toInt(),
           'printed_quantity': mergedItems[existingIndex]['printed_quantity'] ?? 0,
+          'instructions': finalInstructions,
         };
       } else {
         mergedItems.add({
@@ -217,6 +230,7 @@ class SupabaseService {
           'quantity': (newItem['quantity'] as num).toInt(),
           'printed_quantity': 0,
           'price': (newItem['price'] as num).toDouble(),
+          'instructions': newItem['instructions'] ?? '',
         });
       }
     }
@@ -231,6 +245,7 @@ class SupabaseService {
           'quantity': item['quantity'],
           'printed_quantity': item['printed_quantity'] ?? 0,
           'price': item['price'],
+          'instructions': item['instructions'] ?? '',
        };
     }).toList();
     
@@ -280,6 +295,7 @@ class SupabaseService {
         'menu_item_id': item['menu_item_id'],
         'quantity': item['quantity'],
         'price': item['price'],
+        'instructions': item['instructions'] ?? '',
       }).toList();
 
       await client.from('order_items').insert(orderItems);

@@ -791,6 +791,7 @@ class _EditOrderDialogState extends State<_EditOrderDialog> {
       'price': item.price,
       'name': item.itemName,
       'item_type': item.itemType,
+      'instructions': item.instructions ?? '',
     }).toList();
   }
 
@@ -913,6 +914,7 @@ class _EditOrderDialogState extends State<_EditOrderDialog> {
                                       'price': item.price,
                                       'name': item.name,
                                       'item_type': item.itemType,
+                                      'instructions': '',
                                     });
                                   }
                                   // Clear search query after adding
@@ -1047,6 +1049,7 @@ class _EditOrderDialogState extends State<_EditOrderDialog> {
                         'quantity': newQty,
                         'printed_quantity': finalPrinted,
                         'price': item['price'],
+                        'instructions': item['instructions'] ?? '',
                       };
                     }).toList();
 
