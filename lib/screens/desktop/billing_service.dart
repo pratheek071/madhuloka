@@ -467,24 +467,20 @@ class BillingService {
                                 context.read<RestaurantProvider>().fetchData();
                               }
                             } else if (separateJobs != null) {
-                              final printer = await Printing.pickPrinter(context: context);
-                              if (printer != null) {
-                                for (int i = 0; i < separateJobs.length; i++) {
-                                  await Printing.directPrintPdf(
-                                    printer: printer,
-                                    onLayout: (format) async => separateJobs[i].save(),
-                                    name: '${filename}_part$i',
-                                  );
-                                }
-                                if (orderToMark != null) {
-                                  await SupabaseService().markOrderAsPrinted(orderToMark.id);
-                                  if (context.mounted) {
-                                    context.read<RestaurantProvider>().fetchData();
-                                  }
-                                }
+                              for (int i = 0; i < separateJobs.length; i++) {
+                                await Printing.layoutPdf(
+                                  onLayout: (format) async => separateJobs[i].save(),
+                                  name: '${filename}_part$i',
+                                );
+                              }
+                              if (orderToMark != null) {
+                                await SupabaseService().markOrderAsPrinted(orderToMark.id);
                                 if (context.mounted) {
-                                  Navigator.of(dialogContext).pop();
+                                  context.read<RestaurantProvider>().fetchData();
                                 }
+                              }
+                              if (context.mounted) {
+                                Navigator.of(dialogContext).pop();
                               }
                             } else {
                               await Printing.layoutPdf(
