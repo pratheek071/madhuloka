@@ -324,15 +324,20 @@ class BillingService {
     if (finalFoodItems.isNotEmpty) {
       hasAddedPage = true;
       final kotPdf = pw.Document();
-      final page = pw.Page(
+      kotPdf.addPage(pw.Page(
         pageFormat: PdfPageFormat.roll80,
         margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         build: (pw.Context context) {
           return _buildKotPageContent('KOT - FOOD', order, finalFoodItems);
         },
-      );
-      kotPdf.addPage(page);
-      combinedPdf.addPage(page);
+      ));
+      combinedPdf.addPage(pw.Page(
+        pageFormat: PdfPageFormat.roll80,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        build: (pw.Context context) {
+          return _buildKotPageContent('KOT - FOOD', order, finalFoodItems);
+        },
+      ));
       printJobs.add(kotPdf);
     }
 
@@ -340,15 +345,20 @@ class BillingService {
     if (hasDrinks && drinkItems.isNotEmpty) {
       hasAddedPage = true;
       final botPdf = pw.Document();
-      final page = pw.Page(
+      botPdf.addPage(pw.Page(
         pageFormat: PdfPageFormat.roll80,
         margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         build: (pw.Context context) {
           return _buildKotPageContent('BOT - DRINKS', order, drinkItems);
         },
-      );
-      botPdf.addPage(page);
-      combinedPdf.addPage(page);
+      ));
+      combinedPdf.addPage(pw.Page(
+        pageFormat: PdfPageFormat.roll80,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        build: (pw.Context context) {
+          return _buildKotPageContent('BOT - DRINKS', order, drinkItems);
+        },
+      ));
       printJobs.add(botPdf);
     }
 
@@ -365,11 +375,23 @@ class BillingService {
         onPrintComplete: onPrintComplete,
       );
     } else {
-      await Printing.layoutPdf(
-        onLayout: (PdfPageFormat format) async => combinedPdf.save(),
-        name: filename,
-        format: PdfPageFormat.roll80,
-      );
+      final jobs = printJobs.isNotEmpty ? printJobs : [combinedPdf];
+      for (int i = 0; i < jobs.length; i++) {
+        final job = jobs[i];
+        final jobName = '${filename}_part$i';
+        try {
+          await Printing.layoutPdf(
+            onLayout: (format) async => job.save(),
+            name: jobName,
+            format: PdfPageFormat.roll80,
+          );
+        } catch (e) {
+          debugPrint("KOT/BOT Printing error: $e");
+        }
+        if (i < jobs.length - 1) {
+          await Future.delayed(const Duration(milliseconds: 1000));
+        }
+      }
       if (!forcePrintAll) {
         await SupabaseService().markOrderAsPrinted(order.id);
         if (onPrintComplete != null) {
@@ -424,7 +446,7 @@ class BillingService {
                     borderRadius: BorderRadius.circular(12),
                     child: PdfPreview(
                       build: (format) async => pdf.save(),
-                      allowPrinting: true, // Enable standard printing
+                      allowPrinting: false, // Override printing with our custom actions
                       allowSharing: false,
                       canChangePageFormat: false,
                       canChangeOrientation: false,
@@ -435,109 +457,128 @@ class BillingService {
                           valueColor: AlwaysStoppedAnimation<Color>(Colors.deepOrange),
                         ),
                       ),
-                      actions: [
-                        PdfPreviewAction(
-                          icon: const Icon(Icons.print),
-                          onPressed: (ctx, build, pageFormat) async {
-                            if (invoiceOrder != null) {
-                              int billNumber;
-                              try {
-                                final currentOrder = await Supabase.instance.client
-                                    .from('orders')
-                                    .select('bill_no')
-                                    .eq('id', invoiceOrder.id)
-                                    .single();
-                                
-                                if (currentOrder['bill_no'] != null) {
-                                  billNumber = currentOrder['bill_no'] as int;
-                                } else {
-                                  final response = await Supabase.instance.client
-                                      .from('orders')
-                                      .select('bill_no')
-                                      .order('bill_no', ascending: false)
-                                      .limit(1)
-                                      .maybeSingle();
-                                  
-                                  int lastBillNo = 0;
-                                  if (response != null && response['bill_no'] != null) {
-                                    lastBillNo = response['bill_no'] as int;
-                                  } else {
-                                    final countResponse = await Supabase.instance.client
-                                        .from('orders')
-                                        .select('id')
-                                        .eq('status', 'paid');
-                                    lastBillNo = (countResponse as List).length;
-                                  }
-                                  
-                                  billNumber = lastBillNo + 1;
-                                  
-                                  await Supabase.instance.client
-                                      .from('orders')
-                                      .update({'bill_no': billNumber})
-                                      .eq('id', invoiceOrder.id);
-                                }
-                              } catch (e) {
-                                billNumber = (invoiceOrder.createdAt.millisecondsSinceEpoch ~/ 1000) % 10000;
-                              }
-
-                              final actualPdf = _generateInvoicePdf(
-                                invoiceOrder, 
-                                billNumber, 
-                                customItems: customItems,
-                              );
-
-                              await Printing.layoutPdf(
-                                onLayout: (PdfPageFormat format) async => actualPdf.save(),
-                                name: 'Bill_${invoiceOrder.tableName ?? 'Table'}_REG-${billNumber.toString().padLeft(4, '0')}',
-                                format: PdfPageFormat.roll80,
-                              );
-
-                              if (context.mounted) {
-                                Navigator.of(dialogContext).pop();
-                                context.read<RestaurantProvider>().fetchData();
-                              }
-                            } else if (separateJobs != null) {
-                              for (int i = 0; i < separateJobs.length; i++) {
-                                final job = separateJobs[i];
-                                final jobName = '${filename}_part$i';
-                                try {
-                                  await Printing.layoutPdf(
-                                    onLayout: (format) async => job.save(),
-                                    name: jobName,
-                                    format: PdfPageFormat.roll80,
-                                  );
-                                } catch (e) {
-                                  debugPrint("KOT/BOT Printing error: $e");
-                                }
-                                if (i < separateJobs.length - 1) {
-                                  await Future.delayed(const Duration(milliseconds: 1000));
-                                }
-                              }
-                              if (orderToMark != null) {
-                                await SupabaseService().markOrderAsPrinted(orderToMark.id);
-                                if (onPrintComplete != null) {
-                                  onPrintComplete();
-                                }
-                                if (context.mounted) {
-                                  context.read<RestaurantProvider>().fetchData();
-                                }
-                              }
-                              if (context.mounted) {
-                                Navigator.of(dialogContext).pop();
-                              }
+                      actions: const [],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepOrange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                    ),
+                    onPressed: () async {
+                      if (invoiceOrder != null) {
+                        int billNumber;
+                        try {
+                          final currentOrder = await Supabase.instance.client
+                              .from('orders')
+                              .select('bill_no')
+                              .eq('id', invoiceOrder.id)
+                              .single();
+                          
+                          if (currentOrder['bill_no'] != null) {
+                            billNumber = currentOrder['bill_no'] as int;
+                          } else {
+                            final response = await Supabase.instance.client
+                                .from('orders')
+                                .select('bill_no')
+                                .order('bill_no', ascending: false)
+                                .limit(1)
+                                .maybeSingle();
+                            
+                            int lastBillNo = 0;
+                            if (response != null && response['bill_no'] != null) {
+                              lastBillNo = response['bill_no'] as int;
                             } else {
-                              await Printing.layoutPdf(
-                                onLayout: (PdfPageFormat format) async => pdf.save(),
-                                name: filename,
-                                format: PdfPageFormat.roll80,
-                              );
-                              if (context.mounted) {
-                                Navigator.of(dialogContext).pop();
-                              }
+                              final countResponse = await Supabase.instance.client
+                                  .from('orders')
+                                  .select('id')
+                                  .eq('status', 'paid');
+                              lastBillNo = (countResponse as List).length;
                             }
-                          },
-                        ),
-                      ],
+                            
+                            billNumber = lastBillNo + 1;
+                            
+                            await Supabase.instance.client
+                                .from('orders')
+                                .update({'bill_no': billNumber})
+                                .eq('id', invoiceOrder.id);
+                          }
+                        } catch (e) {
+                          billNumber = (invoiceOrder.createdAt.millisecondsSinceEpoch ~/ 1000) % 10000;
+                        }
+
+                        final actualPdf = _generateInvoicePdf(
+                          invoiceOrder, 
+                          billNumber, 
+                          customItems: customItems,
+                        );
+
+                        await Printing.layoutPdf(
+                          onLayout: (PdfPageFormat format) async => actualPdf.save(),
+                          name: 'Bill_${invoiceOrder.tableName ?? 'Table'}_REG-${billNumber.toString().padLeft(4, '0')}',
+                          format: PdfPageFormat.roll80,
+                        );
+
+                        if (context.mounted) {
+                          Navigator.of(dialogContext).pop();
+                          context.read<RestaurantProvider>().fetchData();
+                        }
+                      } else if (separateJobs != null) {
+                        for (int i = 0; i < separateJobs.length; i++) {
+                          final job = separateJobs[i];
+                          final jobName = '${filename}_part$i';
+                          try {
+                            await Printing.layoutPdf(
+                              onLayout: (format) async => job.save(),
+                              name: jobName,
+                              format: PdfPageFormat.roll80,
+                            );
+                          } catch (e) {
+                            debugPrint("KOT/BOT Printing error: $e");
+                          }
+                          if (i < separateJobs.length - 1) {
+                            await Future.delayed(const Duration(milliseconds: 1000));
+                          }
+                        }
+                        if (orderToMark != null) {
+                          await SupabaseService().markOrderAsPrinted(orderToMark.id);
+                          if (onPrintComplete != null) {
+                            onPrintComplete();
+                          }
+                          if (context.mounted) {
+                            context.read<RestaurantProvider>().fetchData();
+                          }
+                        }
+                        if (dialogContext.mounted) {
+                          Navigator.of(dialogContext).pop();
+                        }
+                      } else {
+                        await Printing.layoutPdf(
+                          onLayout: (PdfPageFormat format) async => pdf.save(),
+                          name: filename,
+                          format: PdfPageFormat.roll80,
+                        );
+                        if (dialogContext.mounted) {
+                          Navigator.of(dialogContext).pop();
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.print_rounded),
+                    label: const Text(
+                      'Print Document',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
