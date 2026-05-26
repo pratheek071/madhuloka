@@ -199,6 +199,7 @@ class SupabaseService {
     // 2. Fetch existing items for this order
     final existingItemsResponse = await client.from('order_items').select().eq('order_id', orderId);
     final List<Map<String, dynamic>> existingItems = List<Map<String, dynamic>>.from(existingItemsResponse);
+    print("APPEND_ITEMS_DEBUG - existingItems: $existingItems");
 
     // 3. Merge incoming items with existing ones
     List<Map<String, dynamic>> mergedItems = [...existingItems];
@@ -249,6 +250,7 @@ class SupabaseService {
        };
     }).toList();
     
+    print("APPEND_ITEMS_DEBUG - itemsToInsert: $itemsToInsert");
     await client.from('order_items').insert(itemsToInsert);
 
     // 5. Update Order Total
@@ -263,11 +265,25 @@ class SupabaseService {
     final items = List<Map<String, dynamic>>.from(response);
 
     // 2. Set printed_quantity = quantity
+    bool updatedAny = false;
     for (var item in items) {
       if (item['quantity'] != item['printed_quantity']) {
         await client.from('order_items').update({
           'printed_quantity': item['quantity'],
         }).eq('id', item['id']);
+        updatedAny = true;
+      }
+    }
+
+    if (updatedAny) {
+      // Force update the order's total_amount to itself to trigger the Supabase stream update.
+      // This will notify the waiter app's active order stream to refresh and get the updated printed_quantities.
+      final orderResponse = await client.from('orders').select('total_amount').eq('id', orderId).maybeSingle();
+      if (orderResponse != null) {
+        final double currentTotal = (orderResponse['total_amount'] as num).toDouble();
+        await client.from('orders').update({
+          'total_amount': currentTotal,
+        }).eq('id', orderId);
       }
     }
   }

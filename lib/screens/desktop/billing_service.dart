@@ -256,11 +256,11 @@ class BillingService {
         pw.SizedBox(height: 5),
         pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
         
-        // 2-Column Heading for Kitchen/Bar
+        // 2-Column Heading for Kitchen/Bar (Qty on Left, Item Name on Right)
         pw.Row(
           children: [
-            pw.Expanded(flex: 4, child: pw.Text('Item Name', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))),
-            pw.Expanded(child: pw.Text('Qty', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))),
+            pw.SizedBox(width: 30, child: pw.Text('Qty', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))),
+            pw.Expanded(child: pw.Text('Item Name', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))),
           ],
         ),
         pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
@@ -272,9 +272,10 @@ class BillingService {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Expanded(flex: 4, child: pw.Text(item.itemName, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold))),
-                  pw.Expanded(child: pw.Text(item.quantity.toString(), textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold))),
+                  pw.SizedBox(width: 30, child: pw.Text(item.quantity.toString(), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold))),
+                  pw.Expanded(child: pw.Text(item.itemName, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold))),
                 ],
               ),
               if (item.instructions != null && item.instructions!.trim().isNotEmpty)
@@ -347,14 +348,14 @@ class BillingService {
       final kotPdf = pw.Document();
       kotPdf.addPage(pw.Page(
         pageFormat: PdfPageFormat.roll80,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        margin: const pw.EdgeInsets.only(left: 10, right: 22, top: 10, bottom: 10),
         build: (pw.Context context) {
           return _buildKotPageContent('KOT - FOOD', order, finalFoodItems);
         },
       ));
       combinedPdf.addPage(pw.Page(
         pageFormat: PdfPageFormat.roll80,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        margin: const pw.EdgeInsets.only(left: 10, right: 22, top: 10, bottom: 10),
         build: (pw.Context context) {
           return _buildKotPageContent('KOT - FOOD', order, finalFoodItems);
         },
@@ -368,14 +369,14 @@ class BillingService {
       final botPdf = pw.Document();
       botPdf.addPage(pw.Page(
         pageFormat: PdfPageFormat.roll80,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        margin: const pw.EdgeInsets.only(left: 10, right: 22, top: 10, bottom: 10),
         build: (pw.Context context) {
           return _buildKotPageContent('BOT - DRINKS', order, drinkItems);
         },
       ));
       combinedPdf.addPage(pw.Page(
         pageFormat: PdfPageFormat.roll80,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        margin: const pw.EdgeInsets.only(left: 10, right: 22, top: 10, bottom: 10),
         build: (pw.Context context) {
           return _buildKotPageContent('BOT - DRINKS', order, drinkItems);
         },
@@ -700,7 +701,7 @@ class BillingService {
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.roll80,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        margin: const pw.EdgeInsets.only(left: 10, right: 22, top: 10, bottom: 10),
         build: (pw.Context ctx) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -823,9 +824,9 @@ class BillingService {
               children: [
                 _buildPdfSummaryCard('Total Orders', '${orders.length}', PdfColors.blue),
                 pw.SizedBox(width: 16),
-                _buildPdfSummaryCard('Total Discounts', '₹${totalDiscount.toStringAsFixed(2)}', PdfColors.purple),
+                _buildPdfSummaryCard('Total Discounts', 'Rs. ${totalDiscount.toStringAsFixed(2)}', PdfColors.purple),
                 pw.SizedBox(width: 16),
-                _buildPdfSummaryCard('Total Revenue', '₹${totalRevenue.toStringAsFixed(2)}', PdfColors.green),
+                _buildPdfSummaryCard('Total Revenue', 'Rs. ${totalRevenue.toStringAsFixed(2)}', PdfColors.green),
               ],
             ),
             pw.SizedBox(height: 20),
@@ -867,8 +868,8 @@ class BillingService {
                       _buildTableCell(order.isParcel ? 'Parcel: ${order.customerInfo ?? "N/A"}' : (order.tableName ?? 'Table')),
                       _buildTableCell(order.orderSource.toUpperCase()),
                       _buildTableCell('${order.items.length}'),
-                      _buildTableCell('₹${order.discountAmount.toStringAsFixed(2)}'),
-                      _buildTableCell('₹${order.finalAmount.toStringAsFixed(2)}', isBold: true),
+                      _buildTableCell('Rs. ${order.discountAmount.toStringAsFixed(2)}'),
+                      _buildTableCell('Rs. ${order.finalAmount.toStringAsFixed(2)}', isBold: true),
                       _buildTableCell((order.paymentMethod ?? 'PAID').toUpperCase(), isBold: true),
                     ],
                   );

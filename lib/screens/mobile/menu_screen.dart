@@ -4,6 +4,7 @@ import '../../providers/restaurant_provider.dart';
 import '../../models/table_model.dart';
 import '../../models/order_model.dart';
 import '../../models/order_item_model.dart';
+import '../../models/menu_item_model.dart';
 import '../../services/supabase_service.dart';
 import 'cart_screen.dart';
 
@@ -237,27 +238,71 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<void> _updateOrderedItemQuantity(OrderModel order, OrderItem targetItem, int newQuantity) async {
+    final provider = context.read<RestaurantProvider>();
     final List<Map<String, dynamic>> itemsToSave = [];
     double newTotal = 0.0;
 
-    for (var item in order.items) {
-      int quantity = item.id == targetItem.id ? newQuantity : item.quantity;
+    // Fetch the latest order items from the DB to avoid stale printed_quantity overwriting
+    List<Map<String, dynamic>> dbItems = [];
+    try {
+      final response = await SupabaseService.client
+          .from('order_items')
+          .select()
+          .eq('order_id', order.id);
+      dbItems = List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint("Error fetching latest order items: $e");
+      // Fallback to local order items if DB fetch fails
+      dbItems = order.items.map((i) => {
+        'id': i.id,
+        'order_id': order.id,
+        'menu_item_id': i.menuItemId,
+        'quantity': i.quantity,
+        'printed_quantity': i.printedQuantity,
+        'price': i.price,
+        'instructions': i.instructions ?? '',
+      }).toList();
+    }
+
+    final menuItems = provider.menuItems;
+
+    for (var dbItem in dbItems) {
+      final String dbItemId = dbItem['id']?.toString() ?? '';
+      
+      // Determine new quantity for this item
+      int quantity = (dbItem['quantity'] as num).toInt();
+      if (dbItemId == targetItem.id) {
+        quantity = newQuantity;
+      }
       if (quantity <= 0) continue; // Deleted/omitted
 
-      final int origPrinted = item.printedQuantity;
+      final int origPrinted = (dbItem['printed_quantity'] as num?)?.toInt() ?? 0;
       final int finalPrinted = origPrinted > quantity ? quantity : origPrinted;
+
+      final String menuItemId = dbItem['menu_item_id'];
+      // Find the menu item to get the correct item type for tax calculation
+      final menuItem = menuItems.firstWhere(
+        (m) => m.id == menuItemId,
+        orElse: () => MenuItem(
+          id: menuItemId, 
+          categoryId: '', 
+          name: '', 
+          price: (dbItem['price'] as num).toDouble(), 
+          itemType: 'food',
+        ),
+      );
 
       itemsToSave.add({
         'order_id': order.id,
-        'menu_item_id': item.menuItemId,
+        'menu_item_id': menuItemId,
         'quantity': quantity,
         'printed_quantity': finalPrinted,
-        'price': item.price,
-        'instructions': item.instructions ?? '',
+        'price': (dbItem['price'] as num).toDouble(),
+        'instructions': dbItem['instructions'] ?? '',
       });
 
-      double itemPrice = item.price * quantity;
-      final type = item.itemType.toLowerCase();
+      double itemPrice = (dbItem['price'] as num).toDouble() * quantity;
+      final type = menuItem.itemType.toLowerCase();
       if (type == 'food' || type == 'cocktail' || type == 'mocktail') {
         itemPrice *= 1.05;
       }
