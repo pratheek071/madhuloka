@@ -783,23 +783,52 @@ class _EditOrderDialog extends StatefulWidget {
 }
 
 class _EditOrderDialogState extends State<_EditOrderDialog> {
-  late List<Map<String, dynamic>> _editedItems;
+  List<Map<String, dynamic>> _editedItems = [];
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   bool _isSaving = false;
+  bool _isLoadingItems = true;
 
   @override
   void initState() {
     super.initState();
-    _editedItems = widget.order.items.map((item) => <String, dynamic>{
-      'menu_item_id': item.menuItemId,
-      'quantity': item.quantity,
-      'printed_quantity': item.printedQuantity,
-      'price': item.price,
-      'name': item.itemName,
-      'item_type': item.itemType,
-      'instructions': item.instructions ?? '',
-    }).toList();
+    _loadLatestItems();
+  }
+
+  Future<void> _loadLatestItems() async {
+    try {
+      final latestOrder = await SupabaseService().getOrderDetails(widget.order.id);
+      if (mounted) {
+        setState(() {
+          _editedItems = latestOrder.items.map((item) => <String, dynamic>{
+            'menu_item_id': item.menuItemId,
+            'quantity': item.quantity,
+            'printed_quantity': item.printedQuantity,
+            'price': item.price,
+            'name': item.itemName,
+            'item_type': item.itemType,
+            'instructions': item.instructions ?? '',
+          }).toList();
+          _isLoadingItems = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading latest items for edit order: $e");
+      if (mounted) {
+        setState(() {
+          _editedItems = widget.order.items.map((item) => <String, dynamic>{
+            'menu_item_id': item.menuItemId,
+            'quantity': item.quantity,
+            'printed_quantity': item.printedQuantity,
+            'price': item.price,
+            'name': item.itemName,
+            'item_type': item.itemType,
+            'instructions': item.instructions ?? '',
+          }).toList();
+          _isLoadingItems = false;
+        });
+      }
+    }
   }
 
   Map<String, double> _calculateTotals() {
@@ -853,9 +882,15 @@ class _EditOrderDialogState extends State<_EditOrderDialog> {
       content: SizedBox(
         width: 600,
         height: 450,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: _isLoadingItems
+            ? const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.deepOrange),
+                ),
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
             // Search Input
             TextField(
               controller: _searchController,

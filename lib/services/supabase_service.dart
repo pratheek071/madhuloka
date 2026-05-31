@@ -106,10 +106,10 @@ class SupabaseService {
 
   // Place Order
   Future<void> placeOrder(String tableId, List<Map<String, dynamic>> items, double total, {String? customerInfo}) async {
-    // 1. Create Order
+    // 1. Create Order with 0 total first to prevent premature rendering before items are inserted
     final orderResponse = await client.from('orders').insert({
       'table_id': tableId,
-      'total_amount': total,
+      'total_amount': 0.0,
       'status': 'pending',
       'order_source': 'waiter',
       'customer_info': customerInfo,
@@ -128,7 +128,12 @@ class SupabaseService {
 
     await client.from('order_items').insert(orderItems);
 
-    // 3. Update Table Status
+    // 3. Update Order Total to actual total (this triggers the final stream update)
+    await client.from('orders').update({
+      'total_amount': total,
+    }).eq('id', orderId);
+
+    // 4. Update Table Status
     await client.from('tables').update({'status': 'occupied'}).eq('id', tableId);
   }
 
@@ -293,9 +298,9 @@ class SupabaseService {
       print("Starting placeParcelOrder...");
       print("Data: total=$total, customer_info=$customerInfo");
       
-      // 1. Create Order
+      // 1. Create Order with 0 total first to prevent premature rendering
       final orderResponse = await client.from('orders').insert({
-        'total_amount': total,
+        'total_amount': 0.0,
         'status': 'pending',
         'is_parcel': true,
         'customer_info': customerInfo,
@@ -316,6 +321,11 @@ class SupabaseService {
 
       await client.from('order_items').insert(orderItems);
       print("Items inserted successfully.");
+
+      // 3. Update Order Total to the actual total (triggers stream update)
+      await client.from('orders').update({
+        'total_amount': total,
+      }).eq('id', orderId);
     } catch (e) {
       print("CRITICAL ERROR in placeParcelOrder: $e");
       rethrow;

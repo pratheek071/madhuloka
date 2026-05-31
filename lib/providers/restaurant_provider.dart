@@ -124,8 +124,8 @@ class RestaurantProvider with ChangeNotifier {
     return total;
   }
 
-  Future<void> submitOrder(String tableId, {String? customerInfo}) async {
-    if (_isSubmitting) return;
+  Future<bool> submitOrder(String tableId, {String? customerInfo}) async {
+    if (_isSubmitting) return false;
     
     _isSubmitting = true;
     notifyListeners();
@@ -153,6 +153,10 @@ class RestaurantProvider with ChangeNotifier {
       
       clearCart();
       await fetchData(); // Refresh tables status
+      return true;
+    } catch (e) {
+      debugPrint("Error placing order: $e");
+      rethrow;
     } finally {
       _isSubmitting = false;
       notifyListeners();

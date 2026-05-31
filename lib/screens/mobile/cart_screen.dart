@@ -15,6 +15,7 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   final Map<String, TextEditingController> _controllers = {};
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -141,12 +142,15 @@ class _CartScreenState extends State<CartScreen> {
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: provider.isSubmitting 
+                    onPressed: (provider.isSubmitting || _isSaving) 
                       ? null 
                       : () async {
+                          setState(() {
+                            _isSaving = true;
+                          });
                           try {
-                             await provider.submitOrder(widget.table.id, customerInfo: widget.customerName);
-                             if (context.mounted) {
+                             final success = await provider.submitOrder(widget.table.id, customerInfo: widget.customerName);
+                             if (success && context.mounted) {
                                ScaffoldMessenger.of(context).showSnackBar(
                                  const SnackBar(content: Text('Order placed successfully!')),
                                );
@@ -157,6 +161,12 @@ class _CartScreenState extends State<CartScreen> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text('Error: $e')),
                               );
+                            }
+                          } finally {
+                            if (mounted) {
+                              setState(() {
+                                _isSaving = false;
+                              });
                             }
                           }
                         },

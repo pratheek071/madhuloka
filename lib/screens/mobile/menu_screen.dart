@@ -267,11 +267,11 @@ class _MenuScreenState extends State<MenuScreen> {
     final menuItems = provider.menuItems;
 
     for (var dbItem in dbItems) {
-      final String dbItemId = dbItem['id']?.toString() ?? '';
+      final String dbMenuItemId = dbItem['menu_item_id']?.toString() ?? '';
       
       // Determine new quantity for this item
       int quantity = (dbItem['quantity'] as num).toInt();
-      if (dbItemId == targetItem.id) {
+      if (dbMenuItemId == targetItem.menuItemId) {
         quantity = newQuantity;
       }
       if (quantity <= 0) continue; // Deleted/omitted

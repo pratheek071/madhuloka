@@ -170,7 +170,16 @@ class BillingService {
   }
 
   static Future<void> printInvoice(OrderModel order, {BuildContext? context, String? title, List<OrderItem>? customItems}) async {
-    int? billNumber = order.billNo;
+    // Fetch latest order details to prevent printing stale invoice
+    OrderModel latestOrder;
+    try {
+      latestOrder = await SupabaseService().getOrderDetails(order.id);
+    } catch (e) {
+      debugPrint("Error fetching latest order details for invoice: $e");
+      latestOrder = order; // Fallback
+    }
+
+    int? billNumber = latestOrder.billNo;
     
     // Only generate the bill number on direct print (context == null).
     // If context != null, we display PENDING on the preview and generate it only when they print.
@@ -200,19 +209,19 @@ class BillingService {
         await Supabase.instance.client
             .from('orders')
             .update({'bill_no': billNumber})
-            .eq('id', order.id);
+            .eq('id', latestOrder.id);
       } catch (_) {
-        billNumber = (order.createdAt.millisecondsSinceEpoch ~/ 1000) % 10000;
+        billNumber = (latestOrder.createdAt.millisecondsSinceEpoch ~/ 1000) % 10000;
       }
     }
 
     final logoImage = await _loadLogoImage();
-    final pdf = _generateInvoicePdf(order, billNumber, customItems: customItems, logoImage: logoImage);
+    final pdf = _generateInvoicePdf(latestOrder, billNumber, customItems: customItems, logoImage: logoImage);
 
     final String billNoString = billNumber != null 
         ? 'REG-${billNumber.toString().padLeft(4, '0')}' 
         : 'PENDING';
-    final String filename = 'Bill_${order.tableName ?? 'Table'}_$billNoString';
+    final String filename = 'Bill_${latestOrder.tableName ?? 'Table'}_$billNoString';
 
     if (context != null) {
       if (context.mounted) {
@@ -220,7 +229,7 @@ class BillingService {
           context, 
           pdf, 
           filename, 
-          invoiceOrder: order, 
+          invoiceOrder: latestOrder, 
           customItems: customItems,
         );
       }
@@ -300,9 +309,18 @@ class BillingService {
     bool forcePrintAll = false,
     VoidCallback? onPrintComplete,
   }) async {
+    // Fetch latest order details to prevent printing stale items or quantities
+    OrderModel latestOrder;
+    try {
+      latestOrder = await SupabaseService().getOrderDetails(order.id);
+    } catch (e) {
+      debugPrint("Error fetching latest order details for KOT/BOT: $e");
+      latestOrder = order; // Fallback
+    }
+
     final newItemsToPrint = forcePrintAll
-        ? order.items
-        : order.items
+        ? latestOrder.items
+        : latestOrder.items
             .where((item) => (item.quantity - item.printedQuantity) > 0)
             .map((item) => OrderItem(
                 id: item.id,
@@ -350,14 +368,14 @@ class BillingService {
         pageFormat: PdfPageFormat.roll80,
         margin: const pw.EdgeInsets.only(left: 10, right: 22, top: 10, bottom: 10),
         build: (pw.Context context) {
-          return _buildKotPageContent('KOT - FOOD', order, finalFoodItems);
+          return _buildKotPageContent('KOT - FOOD', latestOrder, finalFoodItems);
         },
       ));
       combinedPdf.addPage(pw.Page(
         pageFormat: PdfPageFormat.roll80,
         margin: const pw.EdgeInsets.only(left: 10, right: 22, top: 10, bottom: 10),
         build: (pw.Context context) {
-          return _buildKotPageContent('KOT - FOOD', order, finalFoodItems);
+          return _buildKotPageContent('KOT - FOOD', latestOrder, finalFoodItems);
         },
       ));
       printJobs.add(kotPdf);
@@ -371,14 +389,14 @@ class BillingService {
         pageFormat: PdfPageFormat.roll80,
         margin: const pw.EdgeInsets.only(left: 10, right: 22, top: 10, bottom: 10),
         build: (pw.Context context) {
-          return _buildKotPageContent('BOT - DRINKS', order, drinkItems);
+          return _buildKotPageContent('BOT - DRINKS', latestOrder, drinkItems);
         },
       ));
       combinedPdf.addPage(pw.Page(
         pageFormat: PdfPageFormat.roll80,
         margin: const pw.EdgeInsets.only(left: 10, right: 22, top: 10, bottom: 10),
         build: (pw.Context context) {
-          return _buildKotPageContent('BOT - DRINKS', order, drinkItems);
+          return _buildKotPageContent('BOT - DRINKS', latestOrder, drinkItems);
         },
       ));
       printJobs.add(botPdf);
@@ -386,17 +404,17 @@ class BillingService {
 
     if (!hasAddedPage) return;
 
-    final String filename = 'KOT_BOT_${order.tableName ?? 'Table'}_${order.id.substring(0, 8)}';
-    if (context != null) {
+    final String filename = 'KOT_BOT_${latestOrder.tableName ?? 'Table'}_${latestOrder.id.substring(0, 8)}';
+    if (context != null && context.mounted) {
       _showPrintPreviewDialog(
         context, 
         combinedPdf, 
         filename, 
         separateJobs: printJobs, 
-        orderToMark: forcePrintAll ? null : order,
+        orderToMark: forcePrintAll ? null : latestOrder,
         onPrintComplete: onPrintComplete,
       );
-    } else {
+    } else if (context == null) {
       final jobs = printJobs.isNotEmpty ? printJobs : [combinedPdf];
       
       Printer? targetPrinter;
@@ -455,7 +473,7 @@ class BillingService {
       }
 
       if (!forcePrintAll) {
-        await SupabaseService().markOrderAsPrinted(order.id);
+        await SupabaseService().markOrderAsPrinted(latestOrder.id);
         if (onPrintComplete != null) {
           onPrintComplete();
         }

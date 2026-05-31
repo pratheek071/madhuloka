@@ -412,19 +412,18 @@ async function placeOrder() {
 
     var existingOrder = existingResult.data;
     var orderId;
+    var existingItems = [];
 
     if (existingOrder) {
-      // Append to existing order
       orderId = existingOrder.id;
-      var currentTotal = Number(existingOrder.total_amount);
-
-      var updateResult = await sb.from('orders').update({ total_amount: currentTotal + total }).eq('id', orderId);
-      if (updateResult.error) throw updateResult.error;
-
+      // Fetch existing items first to merge quantities, avoiding duplicate rows
+      var itemsResult = await sb.from('order_items').select('*').eq('order_id', orderId);
+      if (itemsResult.error) throw itemsResult.error;
+      existingItems = itemsResult.data || [];
     } else {
-      // Create new order
+      // Create new order with total_amount: 0 first
       var orderData = {
-        total_amount: total,
+        total_amount: 0,
         status: 'pending',
         order_source: 'customer',
         customer_info: orderCustomerName,
@@ -442,15 +441,6 @@ async function placeOrder() {
 
       if (orderResult.error) throw orderResult.error;
       orderId = orderResult.data.id;
-    }
-
-    // We need to fetch existing items first to merge quantities, avoiding duplicate rows
-    var existingItems = [];
-    if (existingOrder) {
-      var itemsResult = await sb.from('order_items').select('*').eq('order_id', orderId);
-      if (!itemsResult.error && itemsResult.data) {
-        existingItems = itemsResult.data;
-      }
     }
 
     var mergedItems = [...existingItems];
@@ -474,15 +464,10 @@ async function placeOrder() {
       }
     });
 
-    if (existingOrder) {
-      // Delete old items so we can re-insert the merged list cleanly
-      await sb.from('order_items').delete().eq('order_id', orderId);
-    }
-
     // Clean up IDs before inserting so Supabase generates new ones
     var itemsToInsert = mergedItems.map(function(item) {
       return {
-        order_id: item.order_id,
+        order_id: orderId,
         menu_item_id: item.menu_item_id,
         quantity: item.quantity,
         printed_quantity: item.printed_quantity || 0,
@@ -490,8 +475,28 @@ async function placeOrder() {
       };
     });
 
-    var insertResult = await sb.from('order_items').insert(itemsToInsert);
-    if (insertResult.error) throw insertResult.error;
+    if (existingOrder) {
+      // 1. Delete old items first
+      var deleteResult = await sb.from('order_items').delete().eq('order_id', orderId);
+      if (deleteResult.error) throw deleteResult.error;
+
+      // 2. Insert new items
+      var insertResult = await sb.from('order_items').insert(itemsToInsert);
+      if (insertResult.error) throw insertResult.error;
+
+      // 3. Finally update the order total (this triggers the realtime stream notification in the waiter/desktop apps)
+      var currentTotal = Number(existingOrder.total_amount);
+      var updateResult = await sb.from('orders').update({ total_amount: currentTotal + total }).eq('id', orderId);
+      if (updateResult.error) throw updateResult.error;
+    } else {
+      // For a new order, insert the items first
+      var insertResult = await sb.from('order_items').insert(itemsToInsert);
+      if (insertResult.error) throw insertResult.error;
+
+      // Then update the order total to the actual total (triggers stream update)
+      var updateResult = await sb.from('orders').update({ total_amount: total }).eq('id', orderId);
+      if (updateResult.error) throw updateResult.error;
+    }
 
     // Update table status if needed
     if (tableId) {
