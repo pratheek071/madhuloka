@@ -76,6 +76,9 @@ class BillingService {
               pw.Center(
                 child: pw.Text('RC Comforts Belur Road Chikmagalur 577101', style: const pw.TextStyle(fontSize: 8)),
               ),
+              pw.Center(
+                child: pw.Text('GSTIN: 29BEKPM8971H2ZP', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+              ),
               pw.SizedBox(height: 10),
               
               // Customer Bill Info
