@@ -25,16 +25,74 @@ class BillingService {
     }
   }
 
-  static pw.Document _generateInvoicePdf(OrderModel order, int? billNumber, {List<OrderItem>? customItems, pw.MemoryImage? logoImage}) {
-    final pdf = pw.Document();
+  static Future<int> _ensureBillNumber(OrderModel order) async {
+    if (order.billNo != null) return order.billNo!;
+    try {
+      final currentOrder = await Supabase.instance.client
+          .from('orders')
+          .select('bill_no')
+          .eq('id', order.id)
+          .single();
+
+      if (currentOrder['bill_no'] != null) {
+        return currentOrder['bill_no'] as int;
+      }
+
+      final response = await Supabase.instance.client
+          .from('orders')
+          .select('bill_no')
+          .order('bill_no', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      int lastBillNo = 0;
+      if (response != null && response['bill_no'] != null) {
+        lastBillNo = response['bill_no'] as int;
+      } else {
+        final countResponse = await Supabase.instance.client
+            .from('orders')
+            .select('id')
+            .eq('status', 'paid');
+        lastBillNo = (countResponse as List).length;
+      }
+
+      final int billNumber = lastBillNo + 1;
+
+      await Supabase.instance.client
+          .from('orders')
+          .update({'bill_no': billNumber})
+          .eq('id', order.id);
+
+      return billNumber;
+    } catch (e) {
+      debugPrint("Error generating bill number: $e");
+      return (order.createdAt.millisecondsSinceEpoch ~/ 1000) % 10000;
+    }
+  }
+
+  static void _addInvoicePageToPdf(
+    pw.Document pdf, 
+    OrderModel order, 
+    int? billNumber, {
+    List<OrderItem>? customItems, 
+    pw.MemoryImage? logoImage,
+    String? billSubtitle,
+    String? billNoSuffix,
+    bool isNonTaxableOnly = false,
+  }) {
     final items = customItems ?? order.items;
 
-    final double taxableTotal = items.where((item) {
-          final type = item.itemType.toLowerCase();
-          return type == 'food' || type == 'cocktail' || type == 'mocktail';
-        }).fold(0.0, (sum, item) => sum + (item.price * item.quantity));
-    final double nonTaxableTotal = items.where((item) => item.itemType.toLowerCase() == 'drink')
-        .fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+    final double taxableTotal = isNonTaxableOnly 
+        ? 0.0 
+        : items.where((item) {
+            final type = item.itemType.toLowerCase();
+            return type == 'food' || type == 'cocktail' || type == 'mocktail';
+          }).fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+
+    final double nonTaxableTotal = isNonTaxableOnly
+        ? items.fold(0.0, (sum, item) => sum + (item.price * item.quantity))
+        : items.where((item) => item.itemType.toLowerCase() == 'drink')
+            .fold(0.0, (sum, item) => sum + (item.price * item.quantity));
         
     final double gstAmount = taxableTotal * 0.05;
     final double subtotal = taxableTotal + nonTaxableTotal;
@@ -43,9 +101,12 @@ class BillingService {
     final double discountAmount = total * (discountPercent / 100);
     final double finalTotal = total - discountAmount;
 
-    final String billNoString = billNumber != null 
+    final String baseBillNo = billNumber != null 
         ? 'REG-${billNumber.toString().padLeft(4, '0')}' 
         : 'PENDING';
+    final String billNoString = billNoSuffix != null 
+        ? '$baseBillNo$billNoSuffix' 
+        : baseBillNo;
 
     pdf.addPage(
       pw.Page(
@@ -79,10 +140,26 @@ class BillingService {
               pw.Center(
                 child: pw.Text('GSTIN: 29BEKPM8971H2ZP', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
               ),
-              pw.SizedBox(height: 10),
+              if (billSubtitle != null) ...[
+                pw.SizedBox(height: 4),
+                pw.Center(
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(color: PdfColors.grey700, width: 0.7),
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+                    ),
+                    child: pw.Text(
+                      billSubtitle,
+                      style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+              pw.SizedBox(height: 8),
               
               // Customer Bill Info
-              pw.Text('Bill No: $billNoString', style: const pw.TextStyle(fontSize: 9)),
+              pw.Text('Bill No: $billNoString', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
               pw.Text('Date: ${DateFormat('dd-MM-yyyy').format(order.createdAt)}', style: const pw.TextStyle(fontSize: 9)),
               pw.Text('Time: ${DateFormat('hh:mm a').format(order.createdAt)}', style: const pw.TextStyle(fontSize: 9)),
               if (order.customerInfo != null && order.customerInfo!.isNotEmpty)
@@ -97,7 +174,14 @@ class BillingService {
                   pw.Expanded(flex: 4, child: pw.Text('Item Name', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                   pw.Expanded(flex: 1, child: pw.Text('Qty', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                   pw.Expanded(flex: 2, child: pw.Text('Price', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-                  pw.Expanded(flex: 3, child: pw.Text('Total Price(incl 5% tax)', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                  pw.Expanded(
+                    flex: 3, 
+                    child: pw.Text(
+                      isNonTaxableOnly ? 'Total Price' : 'Total Price(incl 5% tax)', 
+                      textAlign: pw.TextAlign.right, 
+                      style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                    ),
+                  ),
                 ],
               ),
               pw.Divider(thickness: 0.5, color: PdfColors.grey400, height: 8),
@@ -105,7 +189,7 @@ class BillingService {
               // Item Rows
               ...items.map((item) {
                 final type = item.itemType.toLowerCase();
-                final isTaxed = type == 'food' || type == 'cocktail' || type == 'mocktail';
+                final isTaxed = !isNonTaxableOnly && (type == 'food' || type == 'cocktail' || type == 'mocktail');
                 
                 final double rate = item.price;
                 final double taxRate = isTaxed ? (item.price * 1.05) : item.price;
@@ -126,12 +210,12 @@ class BillingService {
               
               pw.Divider(thickness: 0.8, color: PdfColors.grey600, height: 10),
               
-              // Subtotal, Taxes, Grand Total (CGST & SGST removed per request)
+              // Subtotal, Taxes, Grand Total
               if (discountPercent > 0) ...[
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
-                    pw.Text('Total (Incl. Tax):', style: const pw.TextStyle(fontSize: 9)),
+                    pw.Text(isNonTaxableOnly ? 'Subtotal:' : 'Total (Incl. Tax):', style: const pw.TextStyle(fontSize: 9)),
                     pw.Text(total.toStringAsFixed(2), style: const pw.TextStyle(fontSize: 9)),
                   ],
                 ),
@@ -168,7 +252,28 @@ class BillingService {
         },
       ),
     );
+  }
 
+  static pw.Document _generateInvoicePdf(
+    OrderModel order, 
+    int? billNumber, {
+    List<OrderItem>? customItems, 
+    pw.MemoryImage? logoImage,
+    String? billSubtitle,
+    String? billNoSuffix,
+    bool isNonTaxableOnly = false,
+  }) {
+    final pdf = pw.Document();
+    _addInvoicePageToPdf(
+      pdf, 
+      order, 
+      billNumber, 
+      customItems: customItems, 
+      logoImage: logoImage,
+      billSubtitle: billSubtitle,
+      billNoSuffix: billNoSuffix,
+      isNonTaxableOnly: isNonTaxableOnly,
+    );
     return pdf;
   }
 
@@ -187,35 +292,7 @@ class BillingService {
     // Only generate the bill number on direct print (context == null).
     // If context != null, we display PENDING on the preview and generate it only when they print.
     if (context == null && billNumber == null) {
-      try {
-        final response = await Supabase.instance.client
-            .from('orders')
-            .select('bill_no')
-            .order('bill_no', ascending: false)
-            .limit(1)
-            .maybeSingle();
-        
-        int lastBillNo = 0;
-        if (response != null && response['bill_no'] != null) {
-          lastBillNo = response['bill_no'] as int;
-        } else {
-          final countResponse = await Supabase.instance.client
-              .from('orders')
-              .select('id')
-              .eq('status', 'paid');
-          lastBillNo = (countResponse as List).length;
-        }
-
-        billNumber = lastBillNo + 1;
-
-        // Save the newly generated incremental bill number back to the database
-        await Supabase.instance.client
-            .from('orders')
-            .update({'bill_no': billNumber})
-            .eq('id', latestOrder.id);
-      } catch (_) {
-        billNumber = (latestOrder.createdAt.millisecondsSinceEpoch ~/ 1000) % 10000;
-      }
+      billNumber = await _ensureBillNumber(latestOrder);
     }
 
     final logoImage = await _loadLogoImage();
@@ -243,6 +320,400 @@ class BillingService {
         format: PdfPageFormat.roll80,
       );
     }
+  }
+
+  static Future<void> printSplitInvoice(
+    OrderModel order, {
+    BuildContext? context, 
+    VoidCallback? onPrintComplete,
+  }) async {
+    // Fetch latest order details to prevent printing stale invoice
+    OrderModel latestOrder;
+    try {
+      latestOrder = await SupabaseService().getOrderDetails(order.id);
+    } catch (e) {
+      debugPrint("Error fetching latest order details for split invoice: $e");
+      latestOrder = order; // Fallback
+    }
+
+    if (latestOrder.items.isEmpty) {
+      if (context != null && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No items in order to print.'), backgroundColor: Colors.orange),
+        );
+      }
+      return;
+    }
+
+    final taxableItems = latestOrder.items.where((item) {
+      final type = item.itemType.toLowerCase();
+      return type == 'food' || type == 'cocktail' || type == 'mocktail';
+    }).toList();
+
+    final nonTaxableItems = latestOrder.items.where((item) {
+      final type = item.itemType.toLowerCase();
+      return type == 'drink';
+    }).toList();
+
+    // If only one category exists in the order, seamlessly route to single invoice
+    if (nonTaxableItems.isEmpty) {
+      if (context != null && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Order contains only taxable (Food) items. Printing single bill.'), duration: Duration(seconds: 2)),
+        );
+        await printInvoice(latestOrder, context: context, customItems: taxableItems);
+      } else if (context == null) {
+        await printInvoice(latestOrder, context: null, customItems: taxableItems);
+      }
+      return;
+    }
+
+    if (taxableItems.isEmpty) {
+      if (context != null && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Order contains only non-taxable (Drink) items. Printing single bill.'), duration: Duration(seconds: 2)),
+        );
+        await printInvoice(latestOrder, context: context, customItems: nonTaxableItems);
+      } else if (context == null) {
+        await printInvoice(latestOrder, context: null, customItems: nonTaxableItems);
+      }
+      return;
+    }
+
+    // Both categories exist: generate split receipts
+    int? billNumber = latestOrder.billNo;
+    if (context == null && billNumber == null) {
+      billNumber = await _ensureBillNumber(latestOrder);
+    }
+
+    final logoImage = await _loadLogoImage();
+
+    // Generate preview document containing both pages
+    final combinedPdf = pw.Document();
+    _addInvoicePageToPdf(
+      combinedPdf, 
+      latestOrder, 
+      billNumber, 
+      customItems: taxableItems, 
+      logoImage: logoImage,
+      billSubtitle: 'TAX INVOICE (FOOD)',
+      billNoSuffix: ' - FOOD',
+    );
+    _addInvoicePageToPdf(
+      combinedPdf, 
+      latestOrder, 
+      billNumber, 
+      customItems: nonTaxableItems, 
+      logoImage: logoImage,
+      billSubtitle: 'RECEIPT (DRINKS)',
+      billNoSuffix: ' - DRINKS',
+      isNonTaxableOnly: true,
+    );
+
+    final String billNoString = billNumber != null 
+        ? 'REG-${billNumber.toString().padLeft(4, '0')}' 
+        : 'PENDING';
+    final String filename = 'Split_Bill_${latestOrder.tableName ?? 'Table'}_$billNoString';
+
+    if (context != null) {
+      if (context.mounted) {
+        _showPrintPreviewDialog(
+          context, 
+          combinedPdf, 
+          filename, 
+          invoiceOrder: latestOrder,
+          isSplitInvoice: true,
+          splitTaxableItems: taxableItems,
+          splitNonTaxableItems: nonTaxableItems,
+          onPrintComplete: onPrintComplete,
+        );
+      }
+    } else {
+      // Direct print mode
+      final taxableDoc = _generateInvoicePdf(
+        latestOrder, 
+        billNumber, 
+        customItems: taxableItems, 
+        logoImage: logoImage,
+        billSubtitle: 'TAX INVOICE (FOOD)',
+        billNoSuffix: ' - FOOD',
+      );
+      final nonTaxableDoc = _generateInvoicePdf(
+        latestOrder, 
+        billNumber, 
+        customItems: nonTaxableItems, 
+        logoImage: logoImage,
+        billSubtitle: 'RECEIPT (DRINKS)',
+        billNoSuffix: ' - DRINKS',
+        isNonTaxableOnly: true,
+      );
+
+      final jobs = [taxableDoc, nonTaxableDoc];
+
+      Printer? targetPrinter;
+      try {
+        final printers = await Printing.listPrinters();
+        if (printers.isNotEmpty) {
+          targetPrinter = printers.firstWhere(
+            (p) => p.isDefault,
+            orElse: () => printers.first,
+          );
+        }
+      } catch (e) {
+        debugPrint("Error listing printers: $e");
+      }
+
+      if (targetPrinter != null) {
+        for (int i = 0; i < jobs.length; i++) {
+          final job = jobs[i];
+          final jobName = '${filename}_part$i';
+          try {
+            await Printing.directPrintPdf(
+              printer: targetPrinter,
+              onLayout: (format) async => job.save(),
+              format: PdfPageFormat.roll80,
+            );
+          } catch (e) {
+            debugPrint("Direct Split Invoice Printing error: $e");
+            await Printing.layoutPdf(
+              onLayout: (format) async => job.save(),
+              name: jobName,
+              format: PdfPageFormat.roll80,
+            );
+          }
+          if (i < jobs.length - 1) {
+            await Future.delayed(const Duration(milliseconds: 1000));
+          }
+        }
+      } else {
+        for (int i = 0; i < jobs.length; i++) {
+          final job = jobs[i];
+          final jobName = '${filename}_part$i';
+          try {
+            await Printing.layoutPdf(
+              onLayout: (format) async => job.save(),
+              name: jobName,
+              format: PdfPageFormat.roll80,
+            );
+          } catch (e) {
+            debugPrint("Split Invoice Printing error: $e");
+          }
+          if (i < jobs.length - 1) {
+            await Future.delayed(const Duration(milliseconds: 1000));
+          }
+        }
+      }
+
+      if (onPrintComplete != null) {
+        onPrintComplete();
+      }
+    }
+  }
+
+  static void showPrintOptionsDialog(
+    BuildContext context, 
+    OrderModel order, {
+    VoidCallback? onPrintComplete,
+  }) {
+    final taxableCount = order.items.where((item) {
+      final type = item.itemType.toLowerCase();
+      return type == 'food' || type == 'cocktail' || type == 'mocktail';
+    }).fold(0, (sum, item) => sum + item.quantity);
+
+    final nonTaxableCount = order.items.where((item) {
+      final type = item.itemType.toLowerCase();
+      return type == 'drink';
+    }).fold(0, (sum, item) => sum + item.quantity);
+
+    final String tableName = order.isParcel 
+        ? 'Parcel: ${order.customerInfo ?? 'Takeaway'}' 
+        : (order.tableName ?? 'Table Order');
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          width: 480,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.print_rounded, color: Colors.teal, size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Print Bill Options',
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                          Text(
+                            tableName,
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                    onPressed: () => Navigator.pop(dialogContext),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              
+              // Item Breakdown Banner
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A2A2A),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade800),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.restaurant_menu, size: 16, color: Colors.orange.shade300),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Taxable (Food): $taxableCount items',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade300, fontWeight: FontWeight.w500),
+                    ),
+                    const Spacer(),
+                    Container(width: 1, height: 16, color: Colors.grey.shade700),
+                    const Spacer(),
+                    Icon(Icons.local_bar, size: 16, color: Colors.blue.shade300),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Non-Taxable (Drinks): $nonTaxableCount items',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade300, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              // Option 1: Print Together
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () {
+                    Navigator.pop(dialogContext);
+                    printInvoice(order, context: context);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF282828),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.teal.withValues(alpha: 0.5)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.receipt_long_rounded, color: Colors.teal, size: 26),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Print Together',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Single combined receipt with all food and drink items',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right, color: Colors.teal),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              
+              // Option 2: Print Separately
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () {
+                    Navigator.pop(dialogContext);
+                    printSplitInvoice(order, context: context, onPrintComplete: onPrintComplete);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF282828),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.5)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.deepOrange.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.call_split_rounded, color: Colors.deepOrange, size: 26),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Print Separately',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Two separate receipts: Taxable (Food + 5% GST) and Non-Taxable (Drinks)',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right, color: Colors.deepOrange),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   static pw.Widget _buildKotPageContent(String title, OrderModel order, List<OrderItem> items) {
@@ -492,6 +963,9 @@ class BillingService {
     OrderModel? orderToMark,
     OrderModel? invoiceOrder,
     List<OrderItem>? customItems,
+    bool isSplitInvoice = false,
+    List<OrderItem>? splitTaxableItems,
+    List<OrderItem>? splitNonTaxableItems,
     VoidCallback? onPrintComplete,
   }) {
     showDialog(
@@ -559,7 +1033,98 @@ class BillingService {
                     ),
                     onPressed: () async {
                       try {
-                        if (invoiceOrder != null && invoiceOrder.status != 'paid') {
+                        if (isSplitInvoice && invoiceOrder != null) {
+                          int billNumber;
+                          if (invoiceOrder.status != 'paid') {
+                            billNumber = await _ensureBillNumber(invoiceOrder);
+                          } else {
+                            billNumber = invoiceOrder.billNo ?? (invoiceOrder.createdAt.millisecondsSinceEpoch ~/ 1000) % 10000;
+                          }
+
+                          final logoImage = await _loadLogoImage();
+                          final actualTaxablePdf = _generateInvoicePdf(
+                            invoiceOrder, 
+                            billNumber, 
+                            customItems: splitTaxableItems, 
+                            logoImage: logoImage,
+                            billSubtitle: 'TAX INVOICE (FOOD)',
+                            billNoSuffix: ' - FOOD',
+                          );
+
+                          final actualNonTaxablePdf = _generateInvoicePdf(
+                            invoiceOrder, 
+                            billNumber, 
+                            customItems: splitNonTaxableItems, 
+                            logoImage: logoImage,
+                            billSubtitle: 'RECEIPT (DRINKS)',
+                            billNoSuffix: ' - DRINKS',
+                            isNonTaxableOnly: true,
+                          );
+
+                          final jobs = [actualTaxablePdf, actualNonTaxablePdf];
+
+                          Printer? targetPrinter;
+                          try {
+                            final printers = await Printing.listPrinters();
+                            if (printers.isNotEmpty) {
+                              targetPrinter = printers.firstWhere(
+                                (p) => p.isDefault,
+                                orElse: () => printers.first,
+                              );
+                            }
+                          } catch (e) {
+                            debugPrint("Error listing printers: $e");
+                          }
+
+                          if (targetPrinter != null) {
+                            for (int i = 0; i < jobs.length; i++) {
+                              final job = jobs[i];
+                              final jobName = '${filename}_part$i';
+                              try {
+                                await Printing.directPrintPdf(
+                                  printer: targetPrinter,
+                                  onLayout: (format) async => job.save(),
+                                  format: PdfPageFormat.roll80,
+                                );
+                              } catch (e) {
+                                debugPrint("Direct Split Invoice Printing error: $e");
+                                await Printing.layoutPdf(
+                                  onLayout: (format) async => job.save(),
+                                  name: jobName,
+                                  format: PdfPageFormat.roll80,
+                                );
+                              }
+                              if (i < jobs.length - 1) {
+                                await Future.delayed(const Duration(milliseconds: 1000));
+                              }
+                            }
+                          } else {
+                            for (int i = 0; i < jobs.length; i++) {
+                              final job = jobs[i];
+                              final jobName = '${filename}_part$i';
+                              try {
+                                await Printing.layoutPdf(
+                                  onLayout: (format) async => job.save(),
+                                  name: jobName,
+                                  format: PdfPageFormat.roll80,
+                                );
+                              } catch (e) {
+                                debugPrint("Split Invoice Printing error: $e");
+                              }
+                              if (i < jobs.length - 1) {
+                                await Future.delayed(const Duration(milliseconds: 1000));
+                              }
+                            }
+                          }
+
+                          if (onPrintComplete != null) {
+                            onPrintComplete();
+                          }
+                          if (context.mounted) {
+                            Navigator.of(dialogContext).pop();
+                            context.read<RestaurantProvider>().fetchData();
+                          }
+                        } else if (invoiceOrder != null && invoiceOrder.status != 'paid') {
                           int billNumber;
                           try {
                             final currentOrder = await Supabase.instance.client
@@ -935,6 +1500,97 @@ class BillingService {
     final directory = await getApplicationDocumentsDirectory();
     final String dateStr = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
     final String path = "${directory.path}/sales_report_$dateStr.pdf";
+    final file = File(path);
+    await file.writeAsBytes(await pdf.save());
+
+    try {
+      if (Platform.isWindows) {
+        await Process.run('explorer.exe', [path]);
+      } else if (Platform.isMacOS) {
+        await Process.run('open', [path]);
+      }
+    } catch (e) {
+      debugPrint("Could not automatically open PDF: $e");
+    }
+
+    return path;
+  }
+
+  static Future<String> saveAllSplitBillsPdf(
+    DateTime start, 
+    DateTime end, 
+    List<OrderModel> orders, 
+    String paymentFilter,
+  ) async {
+    final pdf = pw.Document();
+    final logoImage = await _loadLogoImage();
+    
+    // Sort orders chronologically
+    final sortedOrders = List<OrderModel>.from(orders)
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    for (final order in sortedOrders) {
+      if (order.items.isEmpty) continue;
+
+      final taxableItems = order.items.where((item) {
+        final type = item.itemType.toLowerCase();
+        return type == 'food' || type == 'cocktail' || type == 'mocktail';
+      }).toList();
+
+      final nonTaxableItems = order.items.where((item) {
+        final type = item.itemType.toLowerCase();
+        return type == 'drink';
+      }).toList();
+
+      if (taxableItems.isNotEmpty && nonTaxableItems.isNotEmpty) {
+        // Add Taxable Bill Page
+        _addInvoicePageToPdf(
+          pdf, 
+          order, 
+          order.billNo, 
+          customItems: taxableItems, 
+          logoImage: logoImage,
+          billSubtitle: 'TAX INVOICE (FOOD)',
+          billNoSuffix: ' - FOOD',
+        );
+        // Add Non-Taxable Bill Page
+        _addInvoicePageToPdf(
+          pdf, 
+          order, 
+          order.billNo, 
+          customItems: nonTaxableItems, 
+          logoImage: logoImage,
+          billSubtitle: 'RECEIPT (DRINKS)',
+          billNoSuffix: ' - DRINKS',
+          isNonTaxableOnly: true,
+        );
+      } else if (taxableItems.isNotEmpty) {
+        _addInvoicePageToPdf(
+          pdf, 
+          order, 
+          order.billNo, 
+          customItems: taxableItems, 
+          logoImage: logoImage,
+          billSubtitle: 'TAX INVOICE (FOOD)',
+          billNoSuffix: ' - FOOD',
+        );
+      } else if (nonTaxableItems.isNotEmpty) {
+        _addInvoicePageToPdf(
+          pdf, 
+          order, 
+          order.billNo, 
+          customItems: nonTaxableItems, 
+          logoImage: logoImage,
+          billSubtitle: 'RECEIPT (DRINKS)',
+          billNoSuffix: ' - DRINKS',
+          isNonTaxableOnly: true,
+        );
+      }
+    }
+
+    final directory = await getApplicationDocumentsDirectory();
+    final String dateStr = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    final String path = "${directory.path}/all_bills_split_$dateStr.pdf";
     final file = File(path);
     await file.writeAsBytes(await pdf.save());
 

@@ -564,7 +564,7 @@ class _OrderDetailsView extends StatelessWidget {
                     color: Colors.brown,
                   ),
                   _ActionButton(
-                    onPressed: () => _safePrint(context, () => BillingService.printInvoice(order, context: context)),
+                    onPressed: () => BillingService.showPrintOptionsDialog(context, order, onPrintComplete: onRefresh),
                     icon: Icons.print,
                     label: 'Print Bill',
                     color: Colors.teal,

@@ -81,19 +81,19 @@ class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepA
         }).toList();
 
         return Padding(
-          padding: const EdgeInsets.all(32.0),
+          padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header with Filter
               _buildHeader(context),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _buildQuickFilters(context),
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
               
               // Summary Cards
               _buildSummaryCards(filteredOrders),
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
               
               // Table and Item Breakdown
               Expanded(
@@ -101,7 +101,7 @@ class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepA
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(flex: 2, child: _buildSalesTable(filteredOrders)),
-                    const SizedBox(width: 32),
+                    const SizedBox(width: 20),
                     Expanded(child: _buildItemBreakdown(filteredOrders)),
                   ],
                 ),
@@ -116,41 +116,45 @@ class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepA
   Widget _buildHeader(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Sales History', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
+            const Text('Sales History', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
             Row(
               children: [
-                const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
-                const SizedBox(width: 8),
+                const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                const SizedBox(width: 6),
                 Text(
                   '${DateFormat('dd MMM yyyy').format(_selectedRange.start)} - ${DateFormat('dd MMM yyyy').format(_selectedRange.end)}',
-                  style: TextStyle(color: Colors.grey.shade700, fontSize: 16),
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
                 ),
               ],
             ),
           ],
         ),
-        Row(
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             SegmentedButton<String>(
               segments: const [
                 ButtonSegment<String>(
                   value: 'All',
-                  icon: Icon(Icons.all_inclusive, size: 16),
+                  icon: Icon(Icons.all_inclusive, size: 14),
                   label: Text('All'),
                 ),
                 ButtonSegment<String>(
                   value: 'Cash',
-                  icon: Icon(Icons.money, size: 16),
+                  icon: Icon(Icons.money, size: 14),
                   label: Text('Cash'),
                 ),
                 ButtonSegment<String>(
                   value: 'Online',
-                  icon: Icon(Icons.payment, size: 16),
+                  icon: Icon(Icons.payment, size: 14),
                   label: Text('Online'),
                 ),
               ],
@@ -165,35 +169,42 @@ class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepA
                 selectedForegroundColor: Colors.white,
               ),
             ),
-            const SizedBox(width: 16),
             OutlinedButton.icon(
               onPressed: _selectDateRange,
-              icon: const Icon(Icons.date_range),
-              label: const Text('Change Date Range'),
+              icon: const Icon(Icons.date_range, size: 16),
+              label: const Text('Change Date'),
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               ),
             ),
-            const SizedBox(width: 16),
             ElevatedButton.icon(
               onPressed: () => _exportReport(context),
-              icon: const Icon(Icons.download),
-              label: const Text('Export to CSV'),
+              icon: const Icon(Icons.download, size: 16),
+              label: const Text('Export CSV'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               ),
             ),
-            const SizedBox(width: 16),
             ElevatedButton.icon(
               onPressed: () => _exportReportPDF(context),
-              icon: const Icon(Icons.picture_as_pdf),
-              label: const Text('Export to PDF'),
+              icon: const Icon(Icons.picture_as_pdf, size: 16),
+              label: const Text('Summary PDF'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red.shade700,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => _downloadAllSplitBillsPDF(context),
+              icon: const Icon(Icons.receipt_long, size: 16),
+              label: const Text('All Bills (Split PDF)'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               ),
             ),
           ],
@@ -350,27 +361,36 @@ class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepA
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10)],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: SingleChildScrollView(
-          child: DataTable(
-            dataRowMinHeight: 56,
-            dataRowMaxHeight: 56,
-            headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
-            columnSpacing: 24,
-            columns: const [
-              DataColumn(label: Text('BILL NO', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('TIME', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('TABLE / INFO', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('SOURCE', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('ITEMS', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('DISCOUNT', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('AMOUNT', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('PAYMENT', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('DETAILS', style: TextStyle(fontWeight: FontWeight.bold))),
-            ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              scrollDirection: Axis.vertical,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                  child: DataTable(
+                    dataRowMinHeight: 48,
+                    dataRowMaxHeight: 64,
+                    headingRowHeight: 48,
+                    headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
+                    columnSpacing: 20,
+                    horizontalMargin: 16,
+                    columns: const [
+                      DataColumn(label: Text('BILL NO', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('TIME', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('TABLE / INFO', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('SOURCE', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('ITEMS', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('DISCOUNT', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('AMOUNT', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('PAYMENT', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('DETAILS', style: TextStyle(fontWeight: FontWeight.bold))),
+                    ],
             rows: orders.asMap().entries.map((entry) {
               final index = entry.key;
               final order = entry.value;
@@ -533,6 +553,10 @@ class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepA
         ),
       ),
     );
+  },
+),
+),
+);
   }
 
   Widget _buildItemBreakdown(List<OrderModel> orders) {
@@ -730,7 +754,7 @@ class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepA
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton.icon(
-                  onPressed: () => _safePrint(context, () => BillingService.printInvoice(order, context: context)),
+                  onPressed: () => BillingService.showPrintOptionsDialog(context, order),
                   icon: const Icon(Icons.print),
                   label: const Text('Print Bill'),
                   style: ElevatedButton.styleFrom(
@@ -1027,6 +1051,60 @@ class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepA
       }
     }
   }
+
+  Future<void> _downloadAllSplitBillsPDF(BuildContext context) async {
+    final provider = context.read<RestaurantProvider>();
+    final orders = await provider.getCompletedOrders(
+      start: _selectedRange.start,
+      end: _selectedRange.end,
+    );
+    
+    final filteredOrders = orders.where((order) {
+      if (_paymentFilter == 'All') return true;
+      return order.paymentMethod?.toLowerCase() == _paymentFilter.toLowerCase();
+    }).toList();
+
+    if (filteredOrders.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No orders found for the selected date range and filter.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (context.mounted) {
+      try {
+        final path = await BillingService.saveAllSplitBillsPdf(
+          _selectedRange.start,
+          _selectedRange.end,
+          filteredOrders,
+          _paymentFilter,
+        );
+        
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('All split bills saved and opened: $path'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to download split bills PDF: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
 }
 
 class _SummaryCard extends StatelessWidget {
@@ -1048,35 +1126,36 @@ class _SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.grey.shade200),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10)],
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: color, size: 24),
+              child: Icon(icon, color: color, size: 22),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(title, style: TextStyle(color: Colors.grey.shade600, fontSize: 13), overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 4),
-                  Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                  Text(title, style: TextStyle(color: Colors.grey.shade600, fontSize: 12), overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
                   if (subtitle != null) ...[
-                    const SizedBox(height: 4),
-                    Text(subtitle!, style: TextStyle(color: Colors.grey.shade500, fontSize: 11), overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Text(subtitle!, style: TextStyle(color: Colors.grey.shade500, fontSize: 10), overflow: TextOverflow.ellipsis),
                   ],
                 ],
               ),
