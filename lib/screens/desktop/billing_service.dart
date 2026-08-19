@@ -819,7 +819,7 @@ class BillingService {
 
     final foodItems = newItemsToPrint.where((item) {
       final type = item.itemType.toLowerCase();
-      return type == 'food';
+      return type != 'drink' && type != 'cocktail' && type != 'mocktail';
     }).toList();
 
     final drinkItems = newItemsToPrint.where((item) {
@@ -827,36 +827,33 @@ class BillingService {
       return type == 'drink' || type == 'cocktail' || type == 'mocktail';
     }).toList();
 
-    final hasDrinks = drinkItems.isNotEmpty;
-    final finalFoodItems = !hasDrinks ? newItemsToPrint : foodItems;
-
     final List<pw.Document> printJobs = [];
     final combinedPdf = pw.Document();
     bool hasAddedPage = false;
 
     // KOT - FOOD
-    if (finalFoodItems.isNotEmpty) {
+    if (foodItems.isNotEmpty) {
       hasAddedPage = true;
       final kotPdf = pw.Document();
       kotPdf.addPage(pw.Page(
         pageFormat: PdfPageFormat.roll80,
         margin: const pw.EdgeInsets.only(left: 10, right: 22, top: 10, bottom: 10),
         build: (pw.Context context) {
-          return _buildKotPageContent('KOT - FOOD', latestOrder, finalFoodItems);
+          return _buildKotPageContent('KOT - FOOD', latestOrder, foodItems);
         },
       ));
       combinedPdf.addPage(pw.Page(
         pageFormat: PdfPageFormat.roll80,
         margin: const pw.EdgeInsets.only(left: 10, right: 22, top: 10, bottom: 10),
         build: (pw.Context context) {
-          return _buildKotPageContent('KOT - FOOD', latestOrder, finalFoodItems);
+          return _buildKotPageContent('KOT - FOOD', latestOrder, foodItems);
         },
       ));
       printJobs.add(kotPdf);
     }
 
     // BOT - DRINKS
-    if (hasDrinks && drinkItems.isNotEmpty) {
+    if (drinkItems.isNotEmpty) {
       hasAddedPage = true;
       final botPdf = pw.Document();
       botPdf.addPage(pw.Page(

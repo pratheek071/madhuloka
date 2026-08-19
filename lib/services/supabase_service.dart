@@ -122,6 +122,7 @@ class SupabaseService {
       'order_id': orderId,
       'menu_item_id': item['menu_item_id'],
       'quantity': item['quantity'],
+      'printed_quantity': item['printed_quantity'] ?? 0,
       'price': item['price'],
       'instructions': item['instructions'] ?? '',
     }).toList();
@@ -223,10 +224,12 @@ class SupabaseService {
           }
         }
 
+        final int existingPrinted = (mergedItems[existingIndex]['printed_quantity'] as num?)?.toInt() ?? 0;
+
         mergedItems[existingIndex] = {
           ...mergedItems[existingIndex],
           'quantity': (mergedItems[existingIndex]['quantity'] as num).toInt() + (newItem['quantity'] as num).toInt(),
-          'printed_quantity': mergedItems[existingIndex]['printed_quantity'] ?? 0,
+          'printed_quantity': existingPrinted,
           'instructions': finalInstructions,
         };
       } else {
@@ -249,7 +252,7 @@ class SupabaseService {
           'order_id': orderId,
           'menu_item_id': item['menu_item_id'],
           'quantity': item['quantity'],
-          'printed_quantity': item['printed_quantity'] ?? 0,
+          'printed_quantity': (item['printed_quantity'] as num?)?.toInt() ?? 0,
           'price': item['price'],
           'instructions': item['instructions'] ?? '',
        };
@@ -265,31 +268,40 @@ class SupabaseService {
   }
 
   Future<void> markOrderAsPrinted(String orderId) async {
-    // 1. Fetch current items
-    final response = await client.from('order_items').select().eq('order_id', orderId);
-    final items = List<Map<String, dynamic>>.from(response);
+    try {
+      // 1. Fetch current items
+      final response = await client.from('order_items').select().eq('order_id', orderId);
+      final items = List<Map<String, dynamic>>.from(response);
 
-    // 2. Set printed_quantity = quantity
-    bool updatedAny = false;
-    for (var item in items) {
-      if (item['quantity'] != item['printed_quantity']) {
-        await client.from('order_items').update({
-          'printed_quantity': item['quantity'],
-        }).eq('id', item['id']);
-        updatedAny = true;
+      // 2. Set printed_quantity = quantity concurrently
+      final updates = <Future>[];
+      for (var item in items) {
+        final int qty = (item['quantity'] as num?)?.toInt() ?? 0;
+        final int printed = (item['printed_quantity'] as num?)?.toInt() ?? 0;
+        if (qty != printed) {
+          updates.add(
+            client.from('order_items').update({
+              'printed_quantity': qty,
+            }).eq('id', item['id']),
+          );
+        }
       }
-    }
 
-    if (updatedAny) {
-      // Force update the order's total_amount to itself to trigger the Supabase stream update.
-      // This will notify the waiter app's active order stream to refresh and get the updated printed_quantities.
-      final orderResponse = await client.from('orders').select('total_amount').eq('id', orderId).maybeSingle();
-      if (orderResponse != null) {
-        final double currentTotal = (orderResponse['total_amount'] as num).toDouble();
-        await client.from('orders').update({
-          'total_amount': currentTotal,
-        }).eq('id', orderId);
+      if (updates.isNotEmpty) {
+        await Future.wait(updates);
+
+        // Force update the order's total_amount to itself to trigger the Supabase stream update.
+        final orderResponse = await client.from('orders').select('total_amount').eq('id', orderId).maybeSingle();
+        if (orderResponse != null) {
+          final double currentTotal = (orderResponse['total_amount'] as num).toDouble();
+          await client.from('orders').update({
+            'total_amount': currentTotal,
+          }).eq('id', orderId);
+        }
       }
+    } catch (e) {
+      print("Error in markOrderAsPrinted: $e");
+      rethrow;
     }
   }
 
@@ -315,6 +327,7 @@ class SupabaseService {
         'order_id': orderId,
         'menu_item_id': item['menu_item_id'],
         'quantity': item['quantity'],
+        'printed_quantity': item['printed_quantity'] ?? 0,
         'price': item['price'],
         'instructions': item['instructions'] ?? '',
       }).toList();
@@ -390,11 +403,22 @@ class SupabaseService {
   }
 
   Future<void> updateOrderItems(String orderId, List<Map<String, dynamic>> items, double totalAmount) async {
+    final sanitizedItems = items.map((item) => {
+      'order_id': orderId,
+      'menu_item_id': item['menu_item_id'],
+      'quantity': item['quantity'],
+      'printed_quantity': item['printed_quantity'] ?? 0,
+      'price': item['price'],
+      'instructions': item['instructions'] ?? '',
+    }).toList();
+
     // 1. Delete old items
     await client.from('order_items').delete().eq('order_id', orderId);
     
     // 2. Insert new items
-    await client.from('order_items').insert(items);
+    if (sanitizedItems.isNotEmpty) {
+      await client.from('order_items').insert(sanitizedItems);
+    }
 
     // 3. Update the order total
     await client.from('orders').update({
