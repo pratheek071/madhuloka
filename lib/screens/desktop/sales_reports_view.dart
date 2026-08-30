@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/restaurant_provider.dart';
 import '../../models/order_model.dart';
+import '../../models/menu_item_model.dart';
+import '../../services/supabase_service.dart';
+import '../../services/admin_security_service.dart';
 import 'billing_service.dart';
 
 class SalesReportsView extends StatefulWidget {
@@ -744,6 +747,19 @@ class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepA
             Row(
               children: [
                 OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _showPasswordPromptDialog(context, order);
+                  },
+                  icon: const Icon(Icons.edit_note, size: 18),
+                  label: const Text('Edit Bill'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orange.shade800,
+                    side: BorderSide(color: Colors.orange.shade800),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
                   onPressed: () => _safePrint(context, () => BillingService.printKotAndBot(order, context: context, forcePrintAll: true)),
                   icon: const Icon(Icons.receipt_long),
                   label: const Text('Print KOT & BOT'),
@@ -770,6 +786,127 @@ class _SalesReportsViewState extends State<SalesReportsView> with AutomaticKeepA
     ),
   );
 }
+
+  void _showPasswordPromptDialog(BuildContext context, OrderModel order) {
+    final pinController = TextEditingController();
+    bool obscureText = true;
+    String? errorMessage;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            void submitPin() {
+              final pin = pinController.text.trim();
+              if (AdminSecurityService.verifyPin(pin)) {
+                Navigator.pop(dialogContext);
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => _EditPaidBillDialog(
+                    order: order,
+                    onSaveComplete: () {
+                      _fetchOrders();
+                      setState(() {});
+                    },
+                  ),
+                );
+              } else {
+                setDialogState(() {
+                  errorMessage = 'Incorrect Admin PIN. Please try again.';
+                });
+              }
+            }
+
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E1E1E),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.deepOrange.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.lock_outline, color: Colors.deepOrange, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Admin Authorization',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 380,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Enter the Admin PIN to edit Bill ${order.billNo != null ? "REG-${order.billNo.toString().padLeft(4, '0')}" : "#${order.id.substring(0, 8)}"}',
+                      style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: pinController,
+                      obscureText: obscureText,
+                      autofocus: true,
+                      style: const TextStyle(color: Colors.white, fontSize: 16, letterSpacing: 2),
+                      decoration: InputDecoration(
+                        labelText: 'Admin PIN',
+                        labelStyle: const TextStyle(color: Colors.grey),
+                        prefixIcon: const Icon(Icons.password, color: Colors.deepOrange),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureText ? Icons.visibility : Icons.visibility_off,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () {
+                            setDialogState(() {
+                              obscureText = !obscureText;
+                            });
+                          },
+                        ),
+                        errorText: errorMessage,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: Colors.deepOrange, width: 2),
+                        ),
+                      ),
+                      onSubmitted: (_) => submitPin(),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  onPressed: submitPin,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepOrange,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('Authorize & Edit'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 
   Future<void> _selectDateRange() async {
     final startController = TextEditingController(
@@ -1224,3 +1361,435 @@ class _QuickFilterButton extends StatelessWidget {
     );
   }
 }
+
+class _EditPaidBillDialog extends StatefulWidget {
+  final OrderModel order;
+  final VoidCallback onSaveComplete;
+
+  const _EditPaidBillDialog({
+    required this.order,
+    required this.onSaveComplete,
+  });
+
+  @override
+  State<_EditPaidBillDialog> createState() => _EditPaidBillDialogState();
+}
+
+class _EditPaidBillDialogState extends State<_EditPaidBillDialog> {
+  List<Map<String, dynamic>> _editedItems = [];
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _isSaving = false;
+  bool _isLoadingItems = true;
+  double _discountPercent = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _discountPercent = widget.order.discount;
+    _loadLatestItems();
+  }
+
+  Future<void> _loadLatestItems() async {
+    try {
+      final latestOrder = await SupabaseService().getOrderDetails(widget.order.id);
+      if (mounted) {
+        setState(() {
+          _discountPercent = latestOrder.discount;
+          _editedItems = latestOrder.items.map((item) => <String, dynamic>{
+            'menu_item_id': item.menuItemId,
+            'quantity': item.quantity,
+            'printed_quantity': item.printedQuantity,
+            'price': item.price,
+            'name': item.itemName,
+            'item_type': item.itemType,
+            'instructions': item.instructions ?? '',
+          }).toList();
+          _isLoadingItems = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading latest items for edit bill: $e");
+      if (mounted) {
+        setState(() {
+          _editedItems = widget.order.items.map((item) => <String, dynamic>{
+            'menu_item_id': item.menuItemId,
+            'quantity': item.quantity,
+            'printed_quantity': item.printedQuantity,
+            'price': item.price,
+            'name': item.itemName,
+            'item_type': item.itemType,
+            'instructions': item.instructions ?? '',
+          }).toList();
+          _isLoadingItems = false;
+        });
+      }
+    }
+  }
+
+  Map<String, double> _calculateTotals() {
+    double subtotal = 0;
+    double gstAmount = 0;
+
+    for (var item in _editedItems) {
+      double itemPrice = (item['price'] as num).toDouble();
+      final type = (item['item_type'] as String).toLowerCase();
+      final qty = (item['quantity'] as num).toInt();
+
+      final linePrice = itemPrice * qty;
+      subtotal += linePrice;
+
+      if (type == 'food' || type == 'cocktail' || type == 'mocktail') {
+        gstAmount += linePrice * 0.05;
+      }
+    }
+
+    final totalBeforeDiscount = subtotal + gstAmount;
+    final discountAmount = totalBeforeDiscount * (_discountPercent / 100);
+    final finalTotal = totalBeforeDiscount - discountAmount;
+
+    return {
+      'subtotal': subtotal,
+      'gst': gstAmount,
+      'discount': discountAmount,
+      'finalTotal': finalTotal,
+      'totalBeforeDiscount': totalBeforeDiscount,
+    };
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<RestaurantProvider>();
+    final menuItems = provider.menuItems;
+
+    final searchResults = _searchQuery.isEmpty
+        ? <MenuItem>[]
+        : menuItems.where((item) =>
+            item.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+
+    return AlertDialog(
+      title: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Edit Bill ${widget.order.billNo != null ? "REG-${widget.order.billNo.toString().padLeft(4, '0')}" : "#${widget.order.id.substring(0, 8)}"}',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.green.shade200),
+            ),
+            child: const Text('PAID BILL', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 650,
+        height: 520,
+        child: _isLoadingItems
+            ? const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.deepOrange),
+                ),
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Search Input
+                  TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search items by name to add to this bill...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                setState(() {
+                                  _searchQuery = '';
+                                  _searchController.clear();
+                                });
+                              },
+                            )
+                          : null,
+                    ),
+                    onChanged: (val) {
+                      setState(() {
+                        _searchQuery = val;
+                      });
+                    },
+                  ),
+
+                  // Search Results
+                  if (_searchQuery.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 140),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        border: Border.all(color: Colors.grey.shade200),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: searchResults.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: Center(child: Text('No matching items found', style: TextStyle(color: Colors.grey))),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: searchResults.length,
+                              itemBuilder: (context, index) {
+                                final item = searchResults[index];
+                                return ListTile(
+                                  dense: true,
+                                  title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  subtitle: Text('₹${item.price} • ${item.itemType}'),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.add_circle, color: Colors.deepOrange),
+                                    onPressed: () {
+                                      setState(() {
+                                        final existingIndex = _editedItems.indexWhere((i) => i['menu_item_id'] == item.id);
+                                        if (existingIndex >= 0) {
+                                          _editedItems[existingIndex]['quantity'] += 1;
+                                        } else {
+                                          _editedItems.add(<String, dynamic>{
+                                            'menu_item_id': item.id,
+                                            'quantity': 1,
+                                            'printed_quantity': 0,
+                                            'price': item.price,
+                                            'name': item.name,
+                                            'item_type': item.itemType,
+                                            'instructions': '',
+                                          });
+                                        }
+                                        _searchQuery = '';
+                                        _searchController.clear();
+                                      });
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 12),
+
+                  // Items List
+                  Expanded(
+                    child: _editedItems.isEmpty
+                        ? const Center(child: Text('No items in this bill.', style: TextStyle(color: Colors.grey)))
+                        : ListView.builder(
+                            itemCount: _editedItems.length,
+                            itemBuilder: (context, index) {
+                              final item = _editedItems[index];
+                              final price = (item['price'] as num).toDouble();
+                              final qty = (item['quantity'] as num).toInt();
+                              return ListTile(
+                                dense: true,
+                                title: Text(item['name'] ?? 'Unknown Item', style: const TextStyle(fontWeight: FontWeight.w600)),
+                                subtitle: Text('₹$price x $qty = ₹${(price * qty).toStringAsFixed(2)}'),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.remove_circle_outline, color: Colors.orange, size: 20),
+                                      onPressed: () {
+                                        setState(() {
+                                          if (item['quantity'] > 1) {
+                                            item['quantity'] -= 1;
+                                          } else {
+                                            _editedItems.removeAt(index);
+                                          }
+                                        });
+                                      },
+                                    ),
+                                    Text('$qty', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                    IconButton(
+                                      icon: const Icon(Icons.add_circle_outline, color: Colors.green, size: 20),
+                                      onPressed: () {
+                                        setState(() {
+                                          item['quantity'] += 1;
+                                        });
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                      onPressed: () {
+                                        setState(() {
+                                          _editedItems.removeAt(index);
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+
+                  const Divider(),
+
+                  // Discount & Totals Section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Builder(
+                      builder: (context) {
+                        final totals = _calculateTotals();
+                        return Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Text('Discount:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                    const SizedBox(width: 8),
+                                    DropdownButton<double>(
+                                      value: _discountPercent,
+                                      isDense: true,
+                                      items: const [
+                                        DropdownMenuItem(value: 0.0, child: Text('0%')),
+                                        DropdownMenuItem(value: 5.0, child: Text('5%')),
+                                        DropdownMenuItem(value: 10.0, child: Text('10%')),
+                                        DropdownMenuItem(value: 15.0, child: Text('15%')),
+                                        DropdownMenuItem(value: 20.0, child: Text('20%')),
+                                        DropdownMenuItem(value: 25.0, child: Text('25%')),
+                                        DropdownMenuItem(value: 30.0, child: Text('30%')),
+                                        DropdownMenuItem(value: 50.0, child: Text('50%')),
+                                      ],
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setState(() => _discountPercent = val);
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  'Total Items: ${_editedItems.fold(0, (sum, item) => sum + (item['quantity'] as num).toInt())}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Subtotal: ₹${totals['subtotal']!.toStringAsFixed(2)} | GST (5%): ₹${totals['gst']!.toStringAsFixed(2)}',
+                                      style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                                    ),
+                                    if (_discountPercent > 0)
+                                      Text(
+                                        'Discount (${_discountPercent.toStringAsFixed(0)}%): -₹${totals['discount']!.toStringAsFixed(2)}',
+                                        style: const TextStyle(color: Colors.purple, fontSize: 12, fontWeight: FontWeight.w500),
+                                      ),
+                                  ],
+                                ),
+                                Text(
+                                  'Grand Total: ₹${totals['finalTotal']!.toStringAsFixed(2)}',
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.deepOrange),
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isSaving
+              ? null
+              : () async {
+                  if (_editedItems.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Cannot save empty bill.')),
+                    );
+                    return;
+                  }
+
+                  setState(() => _isSaving = true);
+                  try {
+                    double newTotal = 0;
+                    final itemsToSave = _editedItems.map((item) {
+                      double itemPrice = (item['price'] as num).toDouble();
+                      final type = (item['item_type'] as String).toLowerCase();
+                      if (type == 'food' || type == 'cocktail' || type == 'mocktail') {
+                        itemPrice *= 1.05;
+                      }
+                      newTotal += itemPrice * (item['quantity'] as num).toInt();
+
+                      final int newQty = (item['quantity'] as num).toInt();
+                      final int origPrinted = (item['printed_quantity'] as num?)?.toInt() ?? 0;
+                      final int finalPrinted = origPrinted > newQty ? newQty : origPrinted;
+
+                      return {
+                        'order_id': widget.order.id,
+                        'menu_item_id': item['menu_item_id'],
+                        'quantity': newQty,
+                        'printed_quantity': finalPrinted,
+                        'price': item['price'],
+                        'instructions': item['instructions'] ?? '',
+                      };
+                    }).toList();
+
+                    // Update items & total in Supabase
+                    await SupabaseService().updateOrderItems(widget.order.id, itemsToSave, newTotal);
+
+                    // Update discount if changed
+                    if (_discountPercent != widget.order.discount) {
+                      await SupabaseService().updateOrderDiscount(widget.order.id, _discountPercent);
+                    }
+
+                    if (!mounted || !context.mounted) return;
+                    context.read<RestaurantProvider>().fetchData();
+                    Navigator.pop(context);
+                    widget.onSaveComplete();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Bill updated successfully!'), backgroundColor: Colors.green),
+                    );
+                  } catch (e) {
+                    if (mounted && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to update bill: $e'), backgroundColor: Colors.red),
+                      );
+                    }
+                  } finally {
+                    if (mounted) setState(() => _isSaving = false);
+                  }
+                },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.deepOrange,
+            foregroundColor: Colors.white,
+          ),
+          child: _isSaving
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Save Changes'),
+        ),
+      ],
+    );
+  }
+}
+
